@@ -16,25 +16,27 @@ main =
 -- MODEL
 
 
-type alias Model = Bool
+type Field = Empty | White | Black
+
+type alias Board = Matrix.Matrix Field
+type alias Model = Board
 
 
 model : Model
-model = False
+model = Matrix.square 11 (\_ -> Empty)
 
 
 
 -- UPDATE
 
 
-type Msg = Boom
+type Msg = Clicked Field
 
 
 update : Msg -> Model -> Model
 update msg model =
   case msg of
-    Boom -> not model
-        
+    Clicked _ -> Matrix.map (\x -> White) model
 
 
 
@@ -42,19 +44,22 @@ update msg model =
 
 
 view : Model -> Html Msg
-view model = div [] <| grid 11
+view model = model 
+    |> Matrix.toList 
+    |> List.map (List.map (\e -> div [ myStyle (pickColor e), onClick (Clicked e) ] [ ]))
+    |> List.map (\l -> div [] l)
+    |> div []
 
+pickColor : Field -> String
+pickColor f = case f of
+    Empty -> "yellow"
+    White -> "white"
+    Black -> "black"
 
-cell : Html Msg
-cell = div [ myStyle, onClick Boom ] [ ]
-
-grid : Int -> List (Html Msg)
-grid size = (square size (\_ -> cell)) |> toList |> List.map (\l -> div [] l)
-
-myStyle : Attribute Msg
-myStyle =
+myStyle : String -> Attribute Msg
+myStyle clr =
   style
-    [ ("backgroundColor", "yellow")
+    [ ("backgroundColor", clr)
     , ("height", "50px")
     , ("width", "50px")
     , ("border", "2px black solid")
