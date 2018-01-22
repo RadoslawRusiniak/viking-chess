@@ -28,7 +28,7 @@ type alias Model =
 model : Model
 model = Model
     (square 11 (\location -> (if row location == 0 then Black else Empty, location)))
-    (Nothing)
+    Nothing
 
 
 -- UPDATE
@@ -40,9 +40,22 @@ type Msg = Clicked Location
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        Clicked lc -> { model | board = Matrix.update lc (\_ -> (White, lc)) model.board }
+        --Clicked lc -> { model | board = Matrix.update lc (\_ -> (White, lc)) model.board }
+        Clicked lc -> handleClick lc model
 
+handleClick : Location -> Model -> Model
+handleClick lc model = 
+    case model.selected of
+        Nothing -> { model | selected = Just lc }
+        Just slc -> { model | board = swapCells lc slc model.board, selected = Nothing }
 
+swapCells : Location -> Location -> Board -> Board
+swapCells lc1 lc2 b = 
+    let
+        val1 = Matrix.get lc1 b |> Maybe.withDefault (White, (0,0)) |> Tuple.first
+        val2 = Matrix.get lc2 b |> Maybe.withDefault (White, (0,0)) |> Tuple.first
+    in
+        b |> Matrix.set lc1 (val2, lc1) |> Matrix.set lc2 (val1, lc2)
 
 -- VIEW
 
