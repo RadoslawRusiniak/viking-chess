@@ -1,7 +1,7 @@
 import Html exposing (Html, Attribute, button, div, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
-
+import Matrix exposing (square, toList)
 
 
 main =
@@ -16,31 +16,25 @@ main =
 -- MODEL
 
 
-type alias Model = Int
+type alias Model = Bool
 
 
 model : Model
-model =
-  0
+model = False
 
 
 
 -- UPDATE
 
 
-type Msg
-  = Increment
-  | Decrement
+type Msg = Boom
 
 
 update : Msg -> Model -> Model
 update msg model =
   case msg of
-    Increment ->
-      model + 1
-
-    Decrement ->
-      model - 1
+    Boom -> not model
+        
 
 
 
@@ -48,16 +42,14 @@ update msg model =
 
 
 view : Model -> Html Msg
-view _ = grid 11
+view model = div [] <| grid 11
+
 
 cell : Html Msg
-cell = div [ myStyle ] [ ]
+cell = div [ myStyle, onClick Boom ] [ ]
 
-row : Int -> Html Msg
-row size = div [ ] (List.repeat size cell)
-
-grid : Int -> Html Msg
-grid size = div [] (List.repeat size (row size))
+grid : Int -> List (Html Msg)
+grid size = (square size (\_ -> cell)) |> toList |> List.map (\l -> div [] l)
 
 myStyle : Attribute Msg
 myStyle =
