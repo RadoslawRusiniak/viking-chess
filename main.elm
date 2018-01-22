@@ -1,7 +1,7 @@
 import Html exposing (Html, Attribute, button, div, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
-import Matrix exposing (square, toList)
+import Matrix exposing (Matrix, square, toList, Location, row, col)
 
 
 main =
@@ -18,25 +18,29 @@ main =
 
 type Field = Empty | White | Black
 
-type alias Board = Matrix.Matrix Field
-type alias Model = Board
+type alias Board = Matrix (Field, Location)
+type alias Model = 
+    { board : Board
+    , selected : Maybe Location
+    }
 
 
 model : Model
-model = Matrix.square 11 (\_ -> Empty)
-
+model = Model
+    (square 11 (\location -> (if row location == 0 then Black else Empty, location)))
+    (Nothing)
 
 
 -- UPDATE
 
 
-type Msg = Clicked Field
+type Msg = Clicked Location
 
 
 update : Msg -> Model -> Model
 update msg model =
-  case msg of
-    Clicked _ -> Matrix.map (\x -> White) model
+    case msg of
+        Clicked lc -> { model | board = Matrix.update lc (\_ -> (White, lc)) model.board }
 
 
 
@@ -44,9 +48,10 @@ update msg model =
 
 
 view : Model -> Html Msg
-view model = model 
+view model =
+    model.board
     |> Matrix.toList 
-    |> List.map (List.map (\e -> div [ myStyle (pickColor e), onClick (Clicked e) ] [ ]))
+    |> List.map (List.map (\(f, lc) -> div [ myStyle (pickColor f), onClick (Clicked lc) ] [ ]))
     |> List.map (\l -> div [] l)
     |> div []
 
