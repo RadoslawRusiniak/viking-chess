@@ -18,7 +18,7 @@ main =
 
 type Field = Empty | Highlighted | White | Black
 
-type alias Board = Matrix (Field, Location)
+type alias Board = Matrix Field
 type alias Model = 
     { board : Board
     , selected : Maybe Location
@@ -26,7 +26,7 @@ type alias Model =
 
 model : Model
 model = Model
-    (square 11 (\location -> (if row location == 0 then Black else Empty, location)))
+    (square 11 (\location -> if row location == 0 then Black else Empty))
     Nothing
 
 
@@ -52,18 +52,18 @@ highlight lc b =
     let
         okRow r = (r == Matrix.row lc)
         okCol c = (c == Matrix.col lc)
-        toBeHighlighted r c e = (okRow r || okCol c) && e == Empty
+        toBeHighlighted (r,c) e = (okRow r || okCol c) && e == Empty
     in
-        Matrix.mapWithLocation (\(r, c) (e, olc) -> if toBeHighlighted r c e then (Highlighted, olc) else (e, olc)) b
+        Matrix.mapWithLocation (\lc e -> if toBeHighlighted lc e then Highlighted else e) b
 
 swapCells : Location -> Location -> Board -> Board
 swapCells lc1 lc2 b = 
     let
-        val1 = Matrix.get lc1 b |> Maybe.map Tuple.first |> withDefault White
-        val2 = Matrix.get lc2 b |> Maybe.map Tuple.first |> withDefault White
+        val1 = Matrix.get lc1 b |> withDefault White
+        val2 = Matrix.get lc2 b |> withDefault White
     in
-        b |> Matrix.set lc1 (val2, lc1) |> Matrix.set lc2 (val1, lc2)
-        |> Matrix.map (\(e, lc) -> if e == Highlighted then (Empty, lc) else (e, lc))
+        b |> Matrix.set lc1 val2 |> Matrix.set lc2 val1
+        |> Matrix.map (\e -> if e == Highlighted then Empty else e)
 
 
 -- VIEW
@@ -72,8 +72,8 @@ swapCells lc1 lc2 b =
 view : Model -> Html Msg
 view model =
     model.board
-    |> Matrix.toList 
-    |> List.map (List.map (\(f, lc) -> div [ myStyle (pickColor f), onClick (Clicked lc) ] [ ]))
+    |> Matrix.mapWithLocation (\lc e -> div [ myStyle (pickColor e), onClick (Clicked lc) ] [])
+    |> Matrix.toList
     |> List.map (\l -> div [] l)
     |> div []
 
