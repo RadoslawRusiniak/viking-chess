@@ -2,7 +2,7 @@ import Html exposing (Html, Attribute, button, div, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Matrix exposing (Matrix, square, toList, Location, row, col)
-
+import Maybe exposing (withDefault)
 
 main =
   Html.beginnerProgram
@@ -16,14 +16,13 @@ main =
 -- MODEL
 
 
-type Field = Empty | White | Black
+type Field = Empty | Highlighted | White | Black
 
 type alias Board = Matrix (Field, Location)
 type alias Model = 
     { board : Board
     , selected : Maybe Location
     }
-
 
 model : Model
 model = Model
@@ -40,22 +39,32 @@ type Msg = Clicked Location
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        --Clicked lc -> { model | board = Matrix.update lc (\_ -> (White, lc)) model.board }
         Clicked lc -> handleClick lc model
 
 handleClick : Location -> Model -> Model
 handleClick lc model = 
     case model.selected of
-        Nothing -> { model | selected = Just lc }
+        Nothing -> { model | selected = Just lc, board = highlight lc model.board }
         Just slc -> { model | board = swapCells lc slc model.board, selected = Nothing }
+
+highlight : Location -> Board -> Board
+highlight lc b = 
+    let
+        okRow r = (r == Matrix.row lc)
+        okCol c = (c == Matrix.col lc)
+        toBeHighlighted r c e = (okRow r || okCol c) && e == Empty
+    in
+        Matrix.mapWithLocation (\(r, c) (e, olc) -> if toBeHighlighted r c e then (Highlighted, olc) else (e, olc)) b
 
 swapCells : Location -> Location -> Board -> Board
 swapCells lc1 lc2 b = 
     let
-        val1 = Matrix.get lc1 b |> Maybe.withDefault (White, (0,0)) |> Tuple.first
-        val2 = Matrix.get lc2 b |> Maybe.withDefault (White, (0,0)) |> Tuple.first
+        val1 = Matrix.get lc1 b |> Maybe.map Tuple.first |> withDefault White
+        val2 = Matrix.get lc2 b |> Maybe.map Tuple.first |> withDefault White
     in
         b |> Matrix.set lc1 (val2, lc1) |> Matrix.set lc2 (val1, lc2)
+        |> Matrix.map (\(e, lc) -> if e == Highlighted then (Empty, lc) else (e, lc))
+
 
 -- VIEW
 
@@ -70,9 +79,10 @@ view model =
 
 pickColor : Field -> String
 pickColor f = case f of
-    Empty -> "yellow"
-    White -> "white"
-    Black -> "black"
+    Empty       -> "yellow"
+    White       -> "white"
+    Black       -> "black"
+    Highlighted -> "orange"
 
 myStyle : String -> Attribute Msg
 myStyle clr =
