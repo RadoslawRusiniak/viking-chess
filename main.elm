@@ -25,9 +25,34 @@ type alias Model =
     }
 
 model : Model
-model = Model
-    (square 11 (\location -> if row location == 0 then Black else Empty))
-    Nothing
+model = 
+    let
+        isWhite lc = List.member lc [
+                              (3, 5)
+                    , (4, 4), (4, 5), (4, 6)     
+            , (5, 3), (5, 4), (5, 5), (5, 6), (5, 7)
+                    , (6, 4), (6, 5), (6, 6)
+                            , (7, 5)
+        ]
+
+        isBlack lc = List.member lc [                   
+                                (0, 3), (0, 4), (0, 5), (0, 6), (0, 7)
+                                              , (1, 5)
+                                        
+                                        
+            , (3, 0)                                                               , (3, 10)
+            , (4, 0)                                                               , (4, 10)
+            , (5, 0), (5, 1)                                              , (5, 9) , (5, 10)
+            , (6, 0)                                                               , (6, 10)
+            , (7, 0)                                                               , (7, 10)
+            
+                                              , (9, 5)
+                              , (10, 3), (10, 4), (10, 5), (10, 6), (10, 7)
+        ]
+    in
+    Model
+        (square 11 (\lc -> if isWhite lc then White else if isBlack lc then Black else Empty))
+        Nothing
 
 
 -- UPDATE
@@ -91,7 +116,7 @@ view model =
 
 pickColor : Field -> String
 pickColor f = case f of
-    Empty       -> "yellow"
+    Empty       -> "peru"
     White       -> "white"
     Black       -> "black"
     Highlighted -> "orange"
