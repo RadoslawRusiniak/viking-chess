@@ -32,14 +32,6 @@ type alias Model =
 init : (Model, Cmd Msg)
 init = 
     let
-        isWhite lc = List.member lc [
-                              (3, 5)
-                    , (4, 4), (4, 5), (4, 6)     
-            , (5, 3), (5, 4), (5, 5), (5, 6), (5, 7)
-                    , (6, 4), (6, 5), (6, 6)
-                            , (7, 5)
-        ]
-
         isBlack lc = List.member lc [                   
                                 (0, 3), (0, 4), (0, 5), (0, 6), (0, 7)
                                               , (1, 5)
@@ -56,32 +48,64 @@ init =
         ]
     in
     (Model
-        (square 11 (\lc -> if isWhite lc then White else if isBlack lc then Black else Empty))
+        (square 11 (\_ -> Empty))
         Nothing
         ""
-    , Cmd.none)
+    , getPawnsPositions)
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
 
 -- UPDATE
 
+type alias HttpRes a = Result Http.Error a
 
-type Msg = Clicked Location | HighlightedArrived (Result Http.Error Int)
+type Msg = Clicked Location | PawnsPositions (HttpRes (List Location, List Location)) | HighlightedArrived (HttpRes Int)
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
-    case msg of
-        Clicked lc -> (model, getHighlighted)
-        HighlightedArrived (Ok x) -> ( { model | board = model.board |> Matrix.set (x, 2) Highlighted }, Cmd.none)
-        HighlightedArrived (Err e) -> ( { model | board = model.board |> Matrix.set (5, 5) Highlighted, txt = toString e } , Cmd.none)
+    let
+        handleErr e = ({ model | txt = toString e}, Cmd.none)
+    in
+        case msg of
+            Clicked lc -> (model, getHighlighted)
+            PawnsPositions (Ok (lstW, lstB)) -> ( { model | board = model.board |> placePawns lstW White |> placePawns lstB Black }, Cmd.none)
+            PawnsPositions (Err e) -> handleErr e
+            HighlightedArrived (Ok x) -> ( { model | board = model.board |> Matrix.set (x, 2) Highlighted }, Cmd.none)
+            HighlightedArrived (Err e) -> handleErr e
+
+placePawns : List Location -> Field -> Board -> Board
+placePawns lst f brd = lst |> List.foldl (\lc b -> Matrix.set lc f b) brd
+
+getPawnsPositions : Cmd Msg
+getPawnsPositions = 
+  let
+    url =
+      "http://www.mocky.io/v2/5a6e0f622e00007f1eb8db4d"
+
+    request =
+      Http.get url decoder
+
+    decoder : Decode.Decoder (List Location, List Location)
+    decoder =
+        let
+            decodeLocation : Decode.Decoder Location
+            decodeLocation = Decode.map2 (,) (Decode.index 0 Decode.int) (Decode.index 1 Decode.int)
+            decodeLocsList : Decode.Decoder (List Location)
+            decodeLocsList = Decode.list decodeLocation
+            decodePairOfLists : Decode.Decoder (List Location, List Location)
+            decodePairOfLists = Decode.map2 (,) (Decode.field "white" decodeLocsList) (Decode.field "black" decodeLocsList)
+        in
+            decodePairOfLists
+  in
+    Http.send PawnsPositions request
 
 getHighlighted : Cmd Msg
 getHighlighted =
   let
     url =
-      "http://www.mocky.io/v2/5a6dde3e2e00001e16b8daf7"
+      "http://www.mocky.io/v2/5a6dde3e2e00001e16b8daf7a"
 
     request =
       Http.get url decodeHighlighted
@@ -141,7 +165,7 @@ view model =
                 |> Matrix.toList
                 |> List.map (div [])
         )
-        , Html.button [ btnstyle ] [ text model.txt ]
+        , div [ errStyle ] [ text model.txt ]
     ]
 
 pickColor : Field -> String
@@ -151,9 +175,9 @@ pickColor f = case f of
     Black       -> "black"
     Highlighted -> "orange"
 
-btnstyle : Attribute Msg
-btnstyle = style [ 
-    ("height", "100px")
+errStyle : Attribute Msg
+errStyle = style [ 
+      ("height", "100px")
     , ("width", "100px")
     ]
 
