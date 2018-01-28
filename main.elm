@@ -5,10 +5,11 @@ import Matrix exposing (Matrix, square, toList, Location, row, col)
 import Maybe exposing (withDefault)
 
 main =
-  Html.beginnerProgram
-    { model = model
+  Html.program
+    { init = init
     , view = view
     , update = update
+    , subscriptions = subscriptions
     }
 
 
@@ -24,8 +25,8 @@ type alias Model =
     , selected : Maybe Location
     }
 
-model : Model
-model = 
+init : (Model, Cmd Msg)
+init = 
     let
         isWhite lc = List.member lc [
                               (3, 5)
@@ -50,10 +51,13 @@ model =
                               , (10, 3), (10, 4), (10, 5), (10, 6), (10, 7)
         ]
     in
-    Model
+    (Model
         (square 11 (\lc -> if isWhite lc then White else if isBlack lc then Black else Empty))
         Nothing
+    , Cmd.none)
 
+subscriptions : Model -> Sub Msg
+subscriptions _ = Sub.none
 
 -- UPDATE
 
@@ -61,10 +65,10 @@ model =
 type Msg = Clicked Location
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-        Clicked lc -> handleClick lc model
+        Clicked lc -> (handleClick lc model, Cmd.none)
 
 handleClick : Location -> Model -> Model
 handleClick lc model =
