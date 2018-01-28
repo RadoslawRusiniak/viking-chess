@@ -4,6 +4,9 @@ import Html.Events exposing (onClick)
 import Matrix exposing (Matrix, square, toList, Location, row, col)
 import Maybe exposing (withDefault)
 
+import Json.Decode as Decode
+import Http
+
 main =
   Html.program
     { init = init
@@ -23,6 +26,7 @@ type alias Board = Matrix Field
 type alias Model = 
     { board : Board
     , selected : Maybe Location
+    , txt : String
     }
 
 init : (Model, Cmd Msg)
@@ -54,6 +58,7 @@ init =
     (Model
         (square 11 (\lc -> if isWhite lc then White else if isBlack lc then Black else Empty))
         Nothing
+        ""
     , Cmd.none)
 
 subscriptions : Model -> Sub Msg
@@ -62,13 +67,30 @@ subscriptions _ = Sub.none
 -- UPDATE
 
 
-type Msg = Clicked Location
+type Msg = Clicked Location | HighlightedArrived (Result Http.Error Int)
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-        Clicked lc -> (handleClick lc model, Cmd.none)
+        Clicked lc -> (model, getHighlighted)
+        HighlightedArrived (Ok x) -> ( { model | board = model.board |> Matrix.set (x, 2) Highlighted }, Cmd.none)
+        HighlightedArrived (Err e) -> ( { model | board = model.board |> Matrix.set (5, 5) Highlighted, txt = toString e } , Cmd.none)
+
+getHighlighted : Cmd Msg
+getHighlighted =
+  let
+    url =
+      "http://www.mocky.io/v2/5a6dde3e2e00001e16b8daf7"
+
+    request =
+      Http.get url decodeHighlighted
+
+    decodeHighlighted : Decode.Decoder Int
+    decodeHighlighted =
+        Decode.field "x" Decode.int
+  in
+    Http.send HighlightedArrived request
 
 handleClick : Location -> Model -> Model
 handleClick lc model =
@@ -111,12 +133,16 @@ swapCells lc1 lc2 b =
 
 
 view : Model -> Html Msg
-view model =
-    model.board
-    |> Matrix.mapWithLocation (\lc e -> div [ myStyle (pickColor e), onClick (Clicked lc) ] [])
-    |> Matrix.toList
-    |> List.map (\l -> div [] l)
-    |> div []
+view model = 
+    div [] [
+        div [] (
+            model.board
+                |> Matrix.mapWithLocation (\lc e -> div [ myStyle (pickColor e), onClick (Clicked lc) ] [])
+                |> Matrix.toList
+                |> List.map (div [])
+        )
+        , Html.button [ btnstyle ] [ text model.txt ]
+    ]
 
 pickColor : Field -> String
 pickColor f = case f of
@@ -124,6 +150,12 @@ pickColor f = case f of
     White       -> "white"
     Black       -> "black"
     Highlighted -> "orange"
+
+btnstyle : Attribute Msg
+btnstyle = style [ 
+    ("height", "100px")
+    , ("width", "100px")
+    ]
 
 myStyle : String -> Attribute Msg
 myStyle clr =
