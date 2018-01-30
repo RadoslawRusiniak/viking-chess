@@ -27,6 +27,7 @@ type alias Model =
     { board : Board
     , selected : Maybe Location
     , history : List Board
+    , textareavalue : String
     , txt : String
     }
 
@@ -37,6 +38,7 @@ init =
         Nothing
         []
         ""
+        ""
     , getPawnsPositions)
 
 subscriptions : Model -> Sub Msg
@@ -46,8 +48,11 @@ subscriptions _ = Sub.none
 
 type alias HttpRes a = Result Http.Error a
 
-type Msg = Clicked Location | PawnsPositions (HttpRes (List Location, List Location)) | HighlightedArrived (HttpRes Int)
-    | LoadHistory | NewHistory (HttpRes (List Board))
+type Msg = Clicked Location | PawnsPositions (HttpRes (List Location, List Location))
+    | LoadHistoryViaHttp
+    | NewHistory (HttpRes (List Board))
+    | UpdatetextAreaValue String
+    | LoadHistoryFromTextArea
     | Next
 
 
@@ -56,26 +61,24 @@ update msg model =
     let
         handleErr e = ({ model | txt = toString e}, Cmd.none)
         emptyBoard = Matrix.square 0 (\_ -> Empty)
+        insertHistoryIntoModel data = ({model | board = List.head data |> withDefault emptyBoard, history = List.tail data |> withDefault []}, Cmd.none)
     in
         case msg of
-            Clicked lc -> (model, getHighlighted)
+            Clicked lc -> (model, Cmd.none)
             PawnsPositions (Ok (lstW, lstB)) -> ( { model | board = model.board |> placePawns lstW White |> placePawns lstB Black }, Cmd.none)
             PawnsPositions (Err e) -> handleErr e
-            HighlightedArrived (Ok x) -> ( { model | board = model.board |> Matrix.set (x, 2) Highlighted }, Cmd.none)
-            HighlightedArrived (Err e) -> handleErr e
-            LoadHistory -> (model, getHistory)
-            NewHistory (Ok h) -> ( { model | board = List.head h |> withDefault emptyBoard, history = List.tail h |> withDefault [] } , Cmd.none)
+            LoadHistoryViaHttp -> (model, getHistory)
+            NewHistory (Ok h) -> insertHistoryIntoModel h
             NewHistory (Err e) -> handleErr e
-            Next ->
-                case List.length model.history of
-                    0 -> (model, Cmd.none)
-                    _ -> ({model | board = List.head model.history |> withDefault emptyBoard, history = List.tail model.history |> withDefault []}, Cmd.none)
+            UpdatetextAreaValue v -> ( { model | textareavalue = v}, Cmd.none)
+            LoadHistoryFromTextArea -> loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel
+            Next -> insertHistoryIntoModel model.history
 
 placePawns : List Location -> Field -> Board -> Board
 placePawns lst f brd = lst |> List.foldl (\lc b -> Matrix.set lc f b) brd
 
-boardDecoder : Decode.Decoder Board
-boardDecoder =
+boardListDecoder : Decode.Decoder (List Board)
+boardListDecoder =
     let
         decodeField : Decode.Decoder Field
         decodeField =
@@ -95,18 +98,22 @@ boardDecoder =
         decodeBoard : Decode.Decoder Board
         decodeBoard = decode2dArr |> Decode.andThen (\l -> Matrix.fromList l |> Decode.succeed)
     in
-        decodeBoard
+        Decode.list decodeBoard
+
+loadHistoryFromTextArea : String -> List Board
+loadHistoryFromTextArea v = 
+    let
+        decodedVal = Decode.decodeString boardListDecoder v
+    in
+        decodedVal |> Result.toMaybe |> withDefault []
 
 getHistory : Cmd Msg
 getHistory =
     let
         url = "http://www.mocky.io/v2/5a70da04330000a550ff5e43"
         request = Http.get url boardListDecoder
-        boardListDecoder : Decode.Decoder (List Board)
-        boardListDecoder = Decode.list boardDecoder
     in
         Http.send NewHistory request
-        
 
 getPawnsPositions : Cmd Msg
 getPawnsPositions = 
@@ -130,21 +137,6 @@ getPawnsPositions =
             decodePairOfLists
   in
     Http.send PawnsPositions request
-        
-getHighlighted : Cmd Msg
-getHighlighted =
-  let
-    url =
-      "http://www.mocky.io/v2/5a6dde3e2e00001e16b8daf7a"
-
-    request =
-      Http.get url decodeHighlighted
-
-    decodeHighlighted : Decode.Decoder Int
-    decodeHighlighted =
-        Decode.field "x" Decode.int
-  in
-    Http.send HighlightedArrived request
 
 handleClick : Location -> Model -> Model
 handleClick lc model =
@@ -195,9 +187,20 @@ view model =
                 |> Matrix.toList
                 |> List.map (div [])
         )
+        , Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
+        , div [] [ 
+            Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ] [
+                Html.textarea [ Html.Events.onInput UpdatetextAreaValue ] []
+                ,             
+                button
+                    [ Html.Attributes.type_ "submit"
+                        , Html.Attributes.disabled False
+                    ]
+                    [ text "Load history from textarea" ]
+            ]
+        ]
+        , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.history) ] [ text "next" ]
         , div [ errStyle ] [ text model.txt ]
-        , Html.button [ onClick LoadHistory ] [ text "Load history" ]
-        , Html.button [ onClick Next ] [ text "next" ]
     ]
 
 pickColor : Field -> String
