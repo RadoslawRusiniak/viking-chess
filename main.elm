@@ -20,36 +20,22 @@ main =
 -- MODEL
 
 
-type Field = Empty | Highlighted | White | Black
+type Field = Empty | Highlighted | White | Black | King
 
 type alias Board = Matrix Field
 type alias Model = 
     { board : Board
     , selected : Maybe Location
+    , history : List Board
     , txt : String
     }
 
 init : (Model, Cmd Msg)
-init = 
-    let
-        isBlack lc = List.member lc [                   
-                                (0, 3), (0, 4), (0, 5), (0, 6), (0, 7)
-                                              , (1, 5)
-                                        
-                                        
-            , (3, 0)                                                               , (3, 10)
-            , (4, 0)                                                               , (4, 10)
-            , (5, 0), (5, 1)                                              , (5, 9) , (5, 10)
-            , (6, 0)                                                               , (6, 10)
-            , (7, 0)                                                               , (7, 10)
-            
-                                              , (9, 5)
-                              , (10, 3), (10, 4), (10, 5), (10, 6), (10, 7)
-        ]
-    in
+init =
     (Model
         (square 11 (\_ -> Empty))
         Nothing
+        []
         ""
     , getPawnsPositions)
 
@@ -61,12 +47,15 @@ subscriptions _ = Sub.none
 type alias HttpRes a = Result Http.Error a
 
 type Msg = Clicked Location | PawnsPositions (HttpRes (List Location, List Location)) | HighlightedArrived (HttpRes Int)
+    | LoadHistory | NewHistory (HttpRes (List Board))
+    | Next
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     let
         handleErr e = ({ model | txt = toString e}, Cmd.none)
+        emptyBoard = Matrix.square 0 (\_ -> Empty)
     in
         case msg of
             Clicked lc -> (model, getHighlighted)
@@ -74,9 +63,50 @@ update msg model =
             PawnsPositions (Err e) -> handleErr e
             HighlightedArrived (Ok x) -> ( { model | board = model.board |> Matrix.set (x, 2) Highlighted }, Cmd.none)
             HighlightedArrived (Err e) -> handleErr e
+            LoadHistory -> (model, getHistory)
+            NewHistory (Ok h) -> ( { model | board = List.head h |> withDefault emptyBoard, history = List.tail h |> withDefault [] } , Cmd.none)
+            NewHistory (Err e) -> handleErr e
+            Next ->
+                case List.length model.history of
+                    0 -> (model, Cmd.none)
+                    _ -> ({model | board = List.head model.history |> withDefault emptyBoard, history = List.tail model.history |> withDefault []}, Cmd.none)
 
 placePawns : List Location -> Field -> Board -> Board
 placePawns lst f brd = lst |> List.foldl (\lc b -> Matrix.set lc f b) brd
+
+boardDecoder : Decode.Decoder Board
+boardDecoder =
+    let
+        decodeField : Decode.Decoder Field
+        decodeField =
+            Decode.int
+                |> Decode.andThen (\x ->
+                case x of
+                        0 -> Decode.succeed Empty
+                        1 -> Decode.succeed Black
+                        2 -> Decode.succeed White
+                        3 -> Decode.succeed King
+                        rest -> Decode.fail <| "Unknown theme: " ++ toString rest
+                )
+        decodeRow : Decode.Decoder (List Field)
+        decodeRow = Decode.list decodeField
+        decode2dArr : Decode.Decoder (List (List Field))
+        decode2dArr = Decode.list decodeRow
+        decodeBoard : Decode.Decoder Board
+        decodeBoard = decode2dArr |> Decode.andThen (\l -> Matrix.fromList l |> Decode.succeed)
+    in
+        decodeBoard
+
+getHistory : Cmd Msg
+getHistory =
+    let
+        url = "http://www.mocky.io/v2/5a70da04330000a550ff5e43"
+        request = Http.get url boardListDecoder
+        boardListDecoder : Decode.Decoder (List Board)
+        boardListDecoder = Decode.list boardDecoder
+    in
+        Http.send NewHistory request
+        
 
 getPawnsPositions : Cmd Msg
 getPawnsPositions = 
@@ -100,7 +130,7 @@ getPawnsPositions =
             decodePairOfLists
   in
     Http.send PawnsPositions request
-
+        
 getHighlighted : Cmd Msg
 getHighlighted =
   let
@@ -166,6 +196,8 @@ view model =
                 |> List.map (div [])
         )
         , div [ errStyle ] [ text model.txt ]
+        , Html.button [ onClick LoadHistory ] [ text "Load history" ]
+        , Html.button [ onClick Next ] [ text "next" ]
     ]
 
 pickColor : Field -> String
@@ -174,6 +206,7 @@ pickColor f = case f of
     White       -> "white"
     Black       -> "black"
     Highlighted -> "orange"
+    King        -> "purple"
 
 errStyle : Attribute Msg
 errStyle = style [ 
