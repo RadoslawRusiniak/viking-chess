@@ -26,9 +26,10 @@ type alias Board = Matrix Field
 type alias Model = 
     { board : Board
     , selected : Maybe Location
-    , history : List Board
+    , historyPrev : List Board
+    , historyNext : List Board
     , textareavalue : String
-    , txt : String
+    , errorText : String
     }
 
 init : (Model, Cmd Msg)
@@ -36,6 +37,7 @@ init =
     (Model
         (square 11 (\_ -> Empty))
         Nothing
+        []
         []
         ""
         ""
@@ -51,17 +53,17 @@ type alias HttpRes a = Result Http.Error a
 type Msg = Clicked Location | PawnsPositions (HttpRes (List Location, List Location))
     | LoadHistoryViaHttp
     | NewHistory (HttpRes (List Board))
-    | UpdatetextAreaValue String
+    | UpdateTextAreaValue String
     | LoadHistoryFromTextArea
-    | Next
+    | Next | Prev
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     let
-        handleErr e = ({ model | txt = toString e}, Cmd.none)
+        handleErr e = ({ model | errorText = toString e}, Cmd.none)
         emptyBoard = Matrix.square 0 (\_ -> Empty)
-        insertHistoryIntoModel data = ({model | board = List.head data |> withDefault emptyBoard, history = List.tail data |> withDefault []}, Cmd.none)
+        insertHistoryIntoModel data = ({model | historyPrev = [], board = List.head data |> withDefault emptyBoard, historyNext = List.tail data |> withDefault []}, Cmd.none)
     in
         case msg of
             Clicked lc -> (model, Cmd.none)
@@ -70,9 +72,10 @@ update msg model =
             LoadHistoryViaHttp -> (model, getHistory)
             NewHistory (Ok h) -> insertHistoryIntoModel h
             NewHistory (Err e) -> handleErr e
-            UpdatetextAreaValue v -> ( { model | textareavalue = v}, Cmd.none)
+            UpdateTextAreaValue v -> ( { model | textareavalue = v}, Cmd.none)
             LoadHistoryFromTextArea -> loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel
-            Next -> insertHistoryIntoModel model.history
+            Next -> ({model | historyPrev = model.board :: model.historyPrev, board = List.head model.historyNext |> withDefault emptyBoard, historyNext = List.tail model.historyNext |> withDefault []}, Cmd.none)
+            Prev -> ({model | historyPrev = List.tail model.historyPrev |> withDefault [], board = List.head model.historyPrev |> withDefault emptyBoard, historyNext = model.board :: model.historyNext}, Cmd.none)
 
 placePawns : List Location -> Field -> Board -> Board
 placePawns lst f brd = lst |> List.foldl (\lc b -> Matrix.set lc f b) brd
@@ -190,7 +193,7 @@ view model =
         , Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
         , div [] [ 
             Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ] [
-                Html.textarea [ Html.Events.onInput UpdatetextAreaValue ] []
+                Html.textarea [ Html.Events.onInput UpdateTextAreaValue ] []
                 ,             
                 button
                     [ Html.Attributes.type_ "submit"
@@ -199,8 +202,9 @@ view model =
                     [ text "Load history from textarea" ]
             ]
         ]
-        , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.history) ] [ text "next" ]
-        , div [ errStyle ] [ text model.txt ]
+        , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
+        , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
+        , div [ errStyle ] [ text model.errorText ]
     ]
 
 pickColor : Field -> String
