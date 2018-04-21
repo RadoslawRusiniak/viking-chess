@@ -24,7 +24,7 @@ main =
 type Field = Empty | Highlighted | White | Black | King
 
 type alias Board = Matrix Field
-type alias Model = 
+type alias Model =
     { board : Board
     , selected : Maybe Location
     , historyPrev : List Board
@@ -46,7 +46,7 @@ init =
         ""
         "0"
         ""
-    , getPawnsPositions)
+    , getBoard)
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
@@ -55,7 +55,8 @@ subscriptions _ = Sub.none
 
 type alias HttpRes a = Result Http.Error a
 
-type Msg = Clicked Location | PawnsPositions (HttpRes (List Location, List Location))
+type Msg =
+      Clicked Location
     | LoadHistoryViaHttp
     | NewHistory (HttpRes (List Board))
     | UpdateTextAreaValue String
@@ -63,7 +64,7 @@ type Msg = Clicked Location | PawnsPositions (HttpRes (List Location, List Locat
     | Next | Prev
     | WhoStarts | WhoStartsAnswer (HttpRes String)
     | GetScore | GetScoreAnswer (HttpRes String)
-
+    | BoardResponse (HttpRes Board)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -74,8 +75,6 @@ update msg model =
     in
         case msg of
             Clicked lc -> (model, Cmd.none)
-            PawnsPositions (Ok (lstW, lstB)) -> ( { model | board = model.board |> placePawns lstW White |> placePawns lstB Black }, Cmd.none)
-            PawnsPositions (Err e) -> handleErr e
             LoadHistoryViaHttp -> (model, getHistory)
             NewHistory (Ok h) -> insertHistoryIntoModel h
             NewHistory (Err e) -> handleErr e
@@ -89,9 +88,8 @@ update msg model =
             GetScore -> (model, getCurrentScore model)
             GetScoreAnswer (Err e) -> handleErr e
             GetScoreAnswer (Ok x) -> ({model | currentScore = x }, Cmd.none)
-
-placePawns : List Location -> Field -> Board -> Board
-placePawns lst f brd = lst |> List.foldl (\lc b -> Matrix.set lc f b) brd
+            BoardResponse (Err e) -> handleErr e
+            BoardResponse (Ok b) -> ( { model | board = b }, Cmd.none)
 
 boardListDecoder : Decode.Decoder (List Board)
 boardListDecoder =
@@ -117,14 +115,14 @@ boardListDecoder =
         Decode.list decodeBoard
 
 loadHistoryFromTextArea : String -> List Board
-loadHistoryFromTextArea v = 
+loadHistoryFromTextArea v =
     let
         decodedVal = Decode.decodeString boardListDecoder v
     in
         decodedVal |> Result.toMaybe |> withDefault []
 
 getWhoStarts : Cmd Msg
-getWhoStarts = 
+getWhoStarts =
     let
         url = "http://localhost:5000/whoStarts"
         whoStartsDecoder : Decode.Decoder String
@@ -136,16 +134,16 @@ getWhoStarts =
 getCurrentScore : Model -> Cmd Msg
 getCurrentScore model =
     let
-        board = encodeBoard model.board
-        url = "http://localhost:5000/getScore?board=" ++ (Encode.encode 0 board)
+        jsonVal = boardToJsonValue model.board
+        url = "http://localhost:5000/getScore?board=" ++ (Encode.encode 0 jsonVal)
         getScoreDecoder : Decode.Decoder String
         getScoreDecoder = Decode.string
         request = Http.get url getScoreDecoder
     in
         Http.send GetScoreAnswer request
 
-encodeBoard : Board -> Encode.Value
-encodeBoard b =
+boardToJsonValue : Board -> Encode.Value
+boardToJsonValue b =
     let
         fieldToChar field =
             case field of
@@ -158,7 +156,35 @@ encodeBoard b =
         toRows b = b |> Matrix.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
     in
         b |> toRows |> List.map Encode.string |> Encode.list
-        
+
+getBoard : Cmd Msg
+getBoard =
+  let
+    url = "http://localhost:5000/getBoard"
+
+    request =
+      Http.get url boardDecoder
+  in
+    Http.send BoardResponse request
+
+boardDecoder : Decode.Decoder Board
+boardDecoder =
+    let
+        charToField : Char -> Field
+        charToField c = case c of
+            '.' -> Empty
+            'a' -> Black
+            'd' -> White
+            'k' -> King
+            _ -> Empty
+        stringToFields : String -> List Field
+        stringToFields s = s |> String.toList |> List.map charToField
+        decodeFieldsRow : Decode.Decoder (List Field)
+        decodeFieldsRow = Decode.string |> Decode.andThen (\x -> x |> stringToFields |> Decode.succeed)
+        decode2DList : Decode.Decoder (List (List Field))
+        decode2DList = Decode.list decodeFieldsRow
+    in
+        decode2DList |> Decode.andThen (\l -> l |> Matrix.fromList |> Decode.succeed)
 
 getHistory : Cmd Msg
 getHistory =
@@ -167,29 +193,6 @@ getHistory =
         request = Http.get url boardListDecoder
     in
         Http.send NewHistory request
-
-getPawnsPositions : Cmd Msg
-getPawnsPositions = 
-  let
-    url =
-      "http://www.mocky.io/v2/5a6e0f622e00007f1eb8db4d"
-
-    request =
-      Http.get url decoder
-
-    decoder : Decode.Decoder (List Location, List Location)
-    decoder =
-        let
-            decodeLocation : Decode.Decoder Location
-            decodeLocation = Decode.map2 (,) (Decode.index 0 Decode.int) (Decode.index 1 Decode.int)
-            decodeLocsList : Decode.Decoder (List Location)
-            decodeLocsList = Decode.list decodeLocation
-            decodePairOfLists : Decode.Decoder (List Location, List Location)
-            decodePairOfLists = Decode.map2 (,) (Decode.field "white" decodeLocsList) (Decode.field "black" decodeLocsList)
-        in
-            decodePairOfLists
-  in
-    Http.send PawnsPositions request
 
 handleClick : Location -> Model -> Model
 handleClick lc model =
@@ -201,13 +204,13 @@ handleClick lc model =
             (Nothing, True)     -> model
             (Nothing, False)    -> { model | selected = Just lc, board = manageHighlight (Just lc) model.board }
             (Just slc, True)    -> { model | board = swapCells lc slc model.board |> manageHighlight Nothing, selected = Nothing }
-            (Just slc, False)   -> { model | selected = Just lc, board = manageHighlight (Just lc) model.board} 
+            (Just slc, False)   -> { model | selected = Just lc, board = manageHighlight (Just lc) model.board}
 
 manageHighlight : Maybe Location -> Board -> Board
 manageHighlight mnewlc b =
     let
         removeHighlight = Matrix.map (\e -> if e == Highlighted then Empty else e)
-        highlight lc b = 
+        highlight lc b =
             let
                 okRow r = (r == Matrix.row lc)
                 okCol c = (c == Matrix.col lc)
@@ -220,7 +223,7 @@ manageHighlight mnewlc b =
             Just newlc -> b |> removeHighlight |> highlight newlc
 
 swapCells : Location -> Location -> Board -> Board
-swapCells lc1 lc2 b = 
+swapCells lc1 lc2 b =
     let
         val1 = Matrix.get lc1 b |> withDefault White
         val2 = Matrix.get lc2 b |> withDefault White
@@ -232,7 +235,7 @@ swapCells lc1 lc2 b =
 
 
 view : Model -> Html Msg
-view model = 
+view model =
     div [] [
         div [] (
             model.board
@@ -241,7 +244,7 @@ view model =
                 |> List.map (div [])
         )
         , Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
-        , div [] [ 
+        , div [] [
             Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ] [
                 Html.textarea [ Html.Events.onInput UpdateTextAreaValue ] []
                 ,             
@@ -269,7 +272,7 @@ pickColor f = case f of
     King        -> "purple"
 
 errStyle : Attribute Msg
-errStyle = style [ 
+errStyle = style [
       ("height", "100px")
     , ("width", "100px")
     ]
