@@ -5,6 +5,7 @@ import Matrix exposing (Matrix, square, toList, Location, row, col)
 import Maybe exposing (withDefault)
 
 import Json.Decode as Decode
+import Json.Encode as Encode
 import Http
 
 main =
@@ -31,6 +32,7 @@ type alias Model =
     , textareavalue : String
     , errorText : String
     , whoStartsVal : String
+    , currentScore : String
     }
 
 init : (Model, Cmd Msg)
@@ -43,6 +45,7 @@ init =
         ""
         ""
         "0"
+        ""
     , getPawnsPositions)
 
 subscriptions : Model -> Sub Msg
@@ -59,6 +62,7 @@ type Msg = Clicked Location | PawnsPositions (HttpRes (List Location, List Locat
     | LoadHistoryFromTextArea
     | Next | Prev
     | WhoStarts | WhoStartsAnswer (HttpRes String)
+    | GetScore | GetScoreAnswer (HttpRes String)
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -82,6 +86,9 @@ update msg model =
             WhoStarts -> (model, getWhoStarts)
             WhoStartsAnswer (Err e) -> handleErr e
             WhoStartsAnswer (Ok x) -> ({model | whoStartsVal = x }, Cmd.none)
+            GetScore -> (model, getCurrentScore model)
+            GetScoreAnswer (Err e) -> handleErr e
+            GetScoreAnswer (Ok x) -> ({model | currentScore = x }, Cmd.none)
 
 placePawns : List Location -> Field -> Board -> Board
 placePawns lst f brd = lst |> List.foldl (\lc b -> Matrix.set lc f b) brd
@@ -125,6 +132,33 @@ getWhoStarts =
         request = Http.get url whoStartsDecoder
     in
         Http.send WhoStartsAnswer request
+
+getCurrentScore : Model -> Cmd Msg
+getCurrentScore model =
+    let
+        board = encodeBoard model.board
+        url = "http://localhost:5000/getScore?board=" ++ (Encode.encode 0 board)
+        getScoreDecoder : Decode.Decoder String
+        getScoreDecoder = Decode.string
+        request = Http.get url getScoreDecoder
+    in
+        Http.send GetScoreAnswer request
+
+encodeBoard : Board -> Encode.Value
+encodeBoard b =
+    let
+        fieldToChar field =
+            case field of
+                Empty -> '.'
+                Highlighted -> '.'
+                White -> 'd'
+                Black -> 'a'
+                King -> 'k'
+        toRows : Board -> List String
+        toRows b = b |> Matrix.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
+    in
+        b |> toRows |> List.map Encode.string |> Encode.list
+        
 
 getHistory : Cmd Msg
 getHistory =
@@ -222,6 +256,8 @@ view model =
         , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
         , div [ errStyle ] [ text model.errorText ]
         , Html.button [ onClick WhoStarts ] [ text ("who starts? " ++ model.whoStartsVal) ]
+        , Html.button [ onClick GetScore ] [ text ("Get score") ]
+        , Html.text model.currentScore
     ]
 
 pickColor : Field -> String
