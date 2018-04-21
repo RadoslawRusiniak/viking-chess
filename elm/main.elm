@@ -236,31 +236,33 @@ swapCells lc1 lc2 b =
 
 view : Model -> Html Msg
 view model =
-    div [] [
+    div [ style [("display", "flex"), ("flex-direction", "row")] ] [
         div [] (
             model.board
                 |> Matrix.mapWithLocation (\lc e -> div [ myStyle (pickColor e), onClick (Clicked lc) ] [])
                 |> Matrix.toList
                 |> List.map (div [])
         )
-        , Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
         , div [] [
-            Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ] [
-                Html.textarea [ Html.Events.onInput UpdateTextAreaValue ] []
-                ,             
-                button
-                    [ Html.Attributes.type_ "submit"
-                        , Html.Attributes.disabled False
-                    ]
-                    [ text "Load history from textarea" ]
+            Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
+            , div [] [
+                Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ] [
+                    Html.textarea [ Html.Events.onInput UpdateTextAreaValue ] []
+                    ,             
+                    button
+                        [ Html.Attributes.type_ "submit"
+                            , Html.Attributes.disabled False
+                        ]
+                        [ text "Load history from textarea" ]
+                ]
             ]
+            , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
+            , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
+            , div [ errStyle ] [ text model.errorText ]
+            , Html.button [ onClick WhoStarts ] [ text ("who starts? " ++ model.whoStartsVal) ]
+            , Html.button [ onClick GetScore ] [ text ("Get score") ]
+            , Html.text model.currentScore
         ]
-        , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
-        , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
-        , div [ errStyle ] [ text model.errorText ]
-        , Html.button [ onClick WhoStarts ] [ text ("who starts? " ++ model.whoStartsVal) ]
-        , Html.button [ onClick GetScore ] [ text ("Get score") ]
-        , Html.text model.currentScore
     ]
 
 pickColor : Field -> String
