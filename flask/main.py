@@ -7,15 +7,9 @@ app.config['SECRET_KEY'] = 'the quick brown fox jumps over the lazy dog'
 app.config['CORS_HEADERS'] = 'Content-Type'
 
 cors = CORS(app, resources={
-    r"/whoStarts": {"origins": "http://localhost:5000"}
-    , r"/getScore": {"origins": "http://localhost:5000"}
+    r"/getScore": {"origins": "http://localhost:5000"}
     , r"/getBoard": {"origins": "http://localhost:5000"}
 })
-
-@app.route('/whoStarts', methods=['GET','POST'])
-@cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
-def whoStarts():
-    return jsonify("1")
 
 
 @app.route('/getScore', methods=['GET','POST'])

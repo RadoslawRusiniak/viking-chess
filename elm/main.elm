@@ -62,7 +62,7 @@ type Msg =
     | UpdateTextAreaValue String
     | LoadHistoryFromTextArea
     | Next | Prev
-    | WhoStarts | WhoStartsAnswer (HttpRes String)
+    | GetBoardClicked
     | GetScore | GetScoreAnswer (HttpRes String)
     | BoardResponse (HttpRes Board)
 
@@ -82,9 +82,7 @@ update msg model =
             LoadHistoryFromTextArea -> loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel
             Next -> ({model | historyPrev = model.board :: model.historyPrev, board = List.head model.historyNext |> withDefault emptyBoard, historyNext = List.tail model.historyNext |> withDefault []}, Cmd.none)
             Prev -> ({model | historyPrev = List.tail model.historyPrev |> withDefault [], board = List.head model.historyPrev |> withDefault emptyBoard, historyNext = model.board :: model.historyNext}, Cmd.none)
-            WhoStarts -> (model, getWhoStarts)
-            WhoStartsAnswer (Err e) -> handleErr e
-            WhoStartsAnswer (Ok x) -> ({model | whoStartsVal = x }, Cmd.none)
+            GetBoardClicked -> (model, getBoard)
             GetScore -> (model, getCurrentScore model)
             GetScoreAnswer (Err e) -> handleErr e
             GetScoreAnswer (Ok x) -> ({model | currentScore = x }, Cmd.none)
@@ -120,16 +118,6 @@ loadHistoryFromTextArea v =
         decodedVal = Decode.decodeString boardListDecoder v
     in
         decodedVal |> Result.toMaybe |> withDefault []
-
-getWhoStarts : Cmd Msg
-getWhoStarts =
-    let
-        url = "http://localhost:5000/whoStarts"
-        whoStartsDecoder : Decode.Decoder String
-        whoStartsDecoder = Decode.string
-        request = Http.get url whoStartsDecoder
-    in
-        Http.send WhoStartsAnswer request
 
 getCurrentScore : Model -> Cmd Msg
 getCurrentScore model =
@@ -259,7 +247,7 @@ view model =
             , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
             , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
             , div [ errStyle ] [ text model.errorText ]
-            , Html.button [ onClick WhoStarts ] [ text ("who starts? " ++ model.whoStartsVal) ]
+            , Html.button [ onClick GetBoardClicked ] [ text "Get board" ]
             , Html.button [ onClick GetScore ] [ text ("Get score") ]
             , Html.text model.currentScore
         ]
