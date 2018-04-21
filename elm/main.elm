@@ -30,6 +30,7 @@ type alias Model =
     , historyNext : List Board
     , textareavalue : String
     , errorText : String
+    , whoStartsVal : String
     }
 
 init : (Model, Cmd Msg)
@@ -41,6 +42,7 @@ init =
         []
         ""
         ""
+        "0"
     , getPawnsPositions)
 
 subscriptions : Model -> Sub Msg
@@ -56,6 +58,7 @@ type Msg = Clicked Location | PawnsPositions (HttpRes (List Location, List Locat
     | UpdateTextAreaValue String
     | LoadHistoryFromTextArea
     | Next | Prev
+    | WhoStarts | WhoStartsAnswer (HttpRes String)
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -76,6 +79,9 @@ update msg model =
             LoadHistoryFromTextArea -> loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel
             Next -> ({model | historyPrev = model.board :: model.historyPrev, board = List.head model.historyNext |> withDefault emptyBoard, historyNext = List.tail model.historyNext |> withDefault []}, Cmd.none)
             Prev -> ({model | historyPrev = List.tail model.historyPrev |> withDefault [], board = List.head model.historyPrev |> withDefault emptyBoard, historyNext = model.board :: model.historyNext}, Cmd.none)
+            WhoStarts -> (model, getWhoStarts)
+            WhoStartsAnswer (Err e) -> handleErr e
+            WhoStartsAnswer (Ok x) -> ({model | whoStartsVal = x }, Cmd.none)
 
 placePawns : List Location -> Field -> Board -> Board
 placePawns lst f brd = lst |> List.foldl (\lc b -> Matrix.set lc f b) brd
@@ -109,6 +115,16 @@ loadHistoryFromTextArea v =
         decodedVal = Decode.decodeString boardListDecoder v
     in
         decodedVal |> Result.toMaybe |> withDefault []
+
+getWhoStarts : Cmd Msg
+getWhoStarts = 
+    let
+        url = "http://localhost:5000/whoStarts"
+        whoStartsDecoder : Decode.Decoder String
+        whoStartsDecoder = Decode.string
+        request = Http.get url whoStartsDecoder
+    in
+        Http.send WhoStartsAnswer request
 
 getHistory : Cmd Msg
 getHistory =
@@ -205,6 +221,7 @@ view model =
         , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
         , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
         , div [ errStyle ] [ text model.errorText ]
+        , Html.button [ onClick WhoStarts ] [ text ("who starts? " ++ model.whoStartsVal) ]
     ]
 
 pickColor : Field -> String
