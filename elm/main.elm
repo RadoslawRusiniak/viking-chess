@@ -17,7 +17,6 @@ main =
     }
 
 
-
 -- MODEL
 
 
@@ -44,7 +43,7 @@ init =
         ""
         ""
         ""
-    , getBoard)
+    , getHistory)
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
@@ -56,13 +55,11 @@ type alias HttpRes a = Result Http.Error a
 type Msg =
       Clicked Location
     | LoadHistoryViaHttp
-    | NewHistory (HttpRes (List Board))
+    | LoadHistoryResponse (HttpRes (List Board))
     | UpdateTextAreaValue String
     | LoadHistoryFromTextArea
     | Next | Prev
-    | GetBoardClicked
     | GetScore | GetScoreAnswer (HttpRes String)
-    | BoardResponse (HttpRes Board)
     | GetMovesResponse (HttpRes (List Location))
     | MakeMoveResponse (HttpRes Board)
 
@@ -71,27 +68,47 @@ update msg model =
     let
         handleErr e = ({ model | errorText = toString e}, Cmd.none)
         emptyBoard = Matrix.square 0 (\_ -> Empty)
-        insertHistoryIntoModel data = ({model | historyPrev = [], board = List.head data |> withDefault emptyBoard, historyNext = List.tail data |> withDefault []}, Cmd.none)
+        getHead lst = List.head lst |> withDefault emptyBoard
+        getTail lst = List.tail lst |> withDefault []
+        insertHistoryIntoModel data = 
+            let
+                rdata = List.reverse data
+            in
+                ( {model | historyPrev = getTail rdata, board = getHead rdata}, Cmd.none)
+        highlight board = List.foldl (\lc brd -> Matrix.update lc (\_ -> Highlighted) brd) board
+        unhighlight = Matrix.map (\el -> if el == Highlighted then Empty else el)
+        zipNext m = {m | historyPrev = m.board :: m.historyPrev, board = getHead m.historyNext,
+                         historyNext = getTail m.historyNext}
+        zipPrev m = {m | historyPrev = getTail m.historyPrev, board = getHead m.historyPrev,
+                         historyNext = m.board :: m.historyNext}
     in
         case msg of
             Clicked location -> (model, handleClick model location)
             LoadHistoryViaHttp -> (model, getHistory)
-            NewHistory (Ok h) -> insertHistoryIntoModel h
-            NewHistory (Err e) -> handleErr e
+            LoadHistoryResponse (Err e) -> handleErr e
+            LoadHistoryResponse (Ok h) -> insertHistoryIntoModel h
             UpdateTextAreaValue v -> ( { model | textareavalue = v}, Cmd.none)
             LoadHistoryFromTextArea -> loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel
-            Next -> ({model | historyPrev = model.board :: model.historyPrev, board = List.head model.historyNext |> withDefault emptyBoard, historyNext = List.tail model.historyNext |> withDefault []}, Cmd.none)
-            Prev -> ({model | historyPrev = List.tail model.historyPrev |> withDefault [], board = List.head model.historyPrev |> withDefault emptyBoard, historyNext = model.board :: model.historyNext}, Cmd.none)
-            GetBoardClicked -> (model, getBoard)
+            Next -> (zipNext model, Cmd.none)
+            Prev -> (zipPrev model, Cmd.none)
             GetScore -> (model, getCurrentScore model)
             GetScoreAnswer (Err e) -> handleErr e
-            GetScoreAnswer (Ok x) -> ({model | currentScore = x }, Cmd.none)
-            BoardResponse (Err e) -> handleErr e
-            BoardResponse (Ok b) -> ( { model | board = b }, Cmd.none)
+            GetScoreAnswer (Ok x) -> ( { model | currentScore = x }, Cmd.none)
             GetMovesResponse (Err e) -> handleErr e
-            GetMovesResponse (Ok locs) -> ( { model | board = highlight model.board locs, possibleMoves = Just locs }, Cmd.none)
+            GetMovesResponse (Ok locs) -> ( { model | board = highlight model.board locs, possibleMoves = Just locs },
+                                            Cmd.none)
             MakeMoveResponse (Err e) -> handleErr e
-            MakeMoveResponse (Ok b) -> ( { model | board = b, possibleMoves = Nothing }, Cmd.none)
+            MakeMoveResponse (Ok b) -> ( { model | board = b, possibleMoves = Nothing, 
+                                         historyPrev = (unhighlight model.board) :: model.historyPrev,
+                                         historyNext = [] }, Cmd.none)
+
+getHistory : Cmd Msg
+getHistory =
+    let
+        url = "http://localhost:5000/getHistory"
+        request = Http.get url boardListDecoder
+    in
+        Http.send LoadHistoryResponse request
 
 handleClick : Model -> Location -> Cmd Msg
 handleClick model location = case model.possibleMoves of
@@ -108,10 +125,6 @@ makeMove board location =
         request = Http.get uri boardDecoder
     in
         Http.send MakeMoveResponse request
-        
-
-highlight : Board -> List Location -> Board
-highlight board = List.foldl (\lc board -> Matrix.update lc (\_ -> Highlighted) board) board
 
 getPossibleMoves : Board -> Location -> Cmd Msg
 getPossibleMoves board location =
@@ -133,44 +146,6 @@ getPossibleMoves board location =
     in
         Http.send GetMovesResponse request
 
-locationToJsonValue : Location -> Encode.Value
-locationToJsonValue location = 
-    let
-        x = Matrix.row location
-        y = Matrix.col location
-    in
-        Encode.list [Encode.int x, Encode.int y]
-
-boardListDecoder : Decode.Decoder (List Board)
-boardListDecoder =
-    let
-        decodeField : Decode.Decoder Field
-        decodeField =
-            Decode.int
-                |> Decode.andThen (\x ->
-                case x of
-                        0 -> Decode.succeed Empty
-                        1 -> Decode.succeed Black
-                        2 -> Decode.succeed White
-                        3 -> Decode.succeed King
-                        rest -> Decode.fail <| "Unknown theme: " ++ toString rest
-                )
-        decodeRow : Decode.Decoder (List Field)
-        decodeRow = Decode.list decodeField
-        decode2dArr : Decode.Decoder (List (List Field))
-        decode2dArr = Decode.list decodeRow
-        decodeBoard : Decode.Decoder Board
-        decodeBoard = decode2dArr |> Decode.andThen (\l -> Matrix.fromList l |> Decode.succeed)
-    in
-        Decode.list decodeBoard
-
-loadHistoryFromTextArea : String -> List Board
-loadHistoryFromTextArea v =
-    let
-        decodedVal = Decode.decodeString boardListDecoder v
-    in
-        decodedVal |> Result.toMaybe |> withDefault []
-
 getCurrentScore : Model -> Cmd Msg
 getCurrentScore model =
     let
@@ -182,30 +157,8 @@ getCurrentScore model =
     in
         Http.send GetScoreAnswer request
 
-boardToJsonValue : Board -> Encode.Value
-boardToJsonValue b =
-    let
-        fieldToChar field =
-            case field of
-                Empty -> '.'
-                Highlighted -> '.'
-                White -> 'd'
-                Black -> 'a'
-                King -> 'k'
-        toRows : Board -> List String
-        toRows b = b |> Matrix.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
-    in
-        b |> toRows |> List.map Encode.string |> Encode.list
-
-getBoard : Cmd Msg
-getBoard =
-  let
-    url = "http://localhost:5000/getBoard"
-
-    request =
-      Http.get url boardDecoder
-  in
-    Http.send BoardResponse request
+loadHistoryFromTextArea : String -> List Board
+loadHistoryFromTextArea s = s |> Decode.decodeString boardListDecoder |> Result.toMaybe |> withDefault []
 
 boardDecoder : Decode.Decoder Board
 boardDecoder =
@@ -226,13 +179,31 @@ boardDecoder =
     in
         decode2DList |> Decode.andThen (\l -> l |> Matrix.fromList |> Decode.succeed)
 
-getHistory : Cmd Msg
-getHistory =
+boardListDecoder : Decode.Decoder (List Board)
+boardListDecoder = Decode.list boardDecoder
+
+locationToJsonValue : Location -> Encode.Value
+locationToJsonValue location = 
     let
-        url = "http://www.mocky.io/v2/5a70da04330000a550ff5e43"
-        request = Http.get url boardListDecoder
+        x = Matrix.row location
+        y = Matrix.col location
     in
-        Http.send NewHistory request
+        Encode.list [Encode.int x, Encode.int y]
+
+boardToJsonValue : Board -> Encode.Value
+boardToJsonValue b =
+    let
+        fieldToChar field =
+            case field of
+                Empty -> '.'
+                Highlighted -> '.'
+                White -> 'd'
+                Black -> 'a'
+                King -> 'k'
+        toRows : Board -> List String
+        toRows b = b |> Matrix.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
+    in
+        b |> toRows |> List.map Encode.string |> Encode.list
 
 
 -- VIEW
@@ -263,7 +234,6 @@ view model =
             , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
             , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
             , div [ errStyle ] [ text model.errorText ]
-            , Html.button [ onClick GetBoardClicked ] [ text "Get board" ]
             , Html.button [ onClick GetScore ] [ text ("Get score") ]
             , Html.text model.currentScore
         ]

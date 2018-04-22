@@ -8,7 +8,7 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 
 cors = CORS(app, resources={
     r"/getScore": {"origins": "http://localhost:5000"}
-    , r"/getBoard": {"origins": "http://localhost:5000"}
+    , r"/getHistory": {"origins": "http://localhost:5000"}
     , r"/getMoves": {"origins": "http://localhost:5000"}
     , r"/makeMove": {"origins": "http://localhost:5000"}
 })
@@ -20,21 +20,23 @@ def getScore():
     return jsonify("3")
 
 
-@app.route('/getBoard', methods=['GET','POST'])
+@app.route('/getHistory', methods=['GET','POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getBoard():
     return jsonify(
-        ["...aaaaa..."
-        ,".....a....."
-        ,"..........."
-        ,"a....d....a"
-        ,"a...ddd...a"
-        ,"aa.ddkdd.aa"
-        ,"a...ddd...a"
-        ,"a....d....a"
-        ,"..........."
-        ,".....a....."
-        ,"...aaaaa..."]
+        [
+            ["...aaaaa..."
+            ,".....a....."
+            ,"..........."
+            ,"a....d....a"
+            ,"a...ddd...a"
+            ,"aa.ddkdd.aa"
+            ,"a...ddd...a"
+            ,"a....d....a"
+            ,"..........."
+            ,".....a....."
+            ,"...aaaaa..."]
+        ]
         )
 
 @app.route('/getMoves', methods=['GET','POST'])
