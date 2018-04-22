@@ -21,7 +21,7 @@ main =
 -- MODEL
 
 
-type Field = Empty | White | Black | King
+type Field = Empty | Defender | Attacker | King
 
 type alias Board = Matrix Field
 type alias Model =
@@ -94,7 +94,7 @@ update msg model =
         handleClick : Model -> Location -> (Model, Cmd Msg)
         handleClick model location =
             case model.clickedLocation of
-                Nothing -> ( { model | clickedLocation = Just location }, getPossibleMoves model.board location)
+                Nothing -> ( { model | clickedLocation = Just location }, getReachablePositions model.board location)
                 Just moves -> 
                     case List.member location (model.possibleMoves |> withDefault []) of
                         True -> ( { model | clickedLocation = Nothing }, makeMove model.board location)
@@ -142,22 +142,18 @@ makeMove board location =
     in
         Http.send MakeMoveResponse request
 
-getPossibleMoves : Board -> Location -> Cmd Msg
-getPossibleMoves board location =
+getReachablePositions : Board -> Location -> Cmd Msg
+getReachablePositions board location =
     let
         jsonBoard = board |> boardToJsonValue |> Encode.encode 0
         jsonLocation = location |> locationToJsonValue |> Encode.encode 0
-        url = server ++ "getMoves?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
+        url = server ++ "getReachablePositions?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
 
-        locationFromList : List Int -> Location
-        locationFromList lst = case lst of
-            [x, y] -> Matrix.loc x y
-            _ -> Matrix.loc 0 0
-        decodeLocation : Decode.Decoder Location
-        decodeLocation = Decode.list Decode.int |> Decode.andThen (\lst -> lst |> locationFromList |> Decode.succeed)
+        locationDecoder : Decode.Decoder Location
+        locationDecoder = Decode.map2 Matrix.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
 
         listOfMovesDecoder : Decode.Decoder (List Location)
-        listOfMovesDecoder = Decode.list decodeLocation
+        listOfMovesDecoder = Decode.field "positions" (Decode.list locationDecoder)
         request = Http.get url listOfMovesDecoder
     in
         Http.send GetMovesResponse request
@@ -181,8 +177,8 @@ boardDecoder =
     let
         charToField c =  case c of
             '.' -> Empty
-            'a' -> Black
-            'd' -> White
+            'a' -> Attacker
+            'd' -> Defender
             'k' -> King
             _ -> Empty
         stringToFields : String -> List Field
@@ -209,10 +205,10 @@ boardToJsonValue : Board -> Encode.Value
 boardToJsonValue b =
     let
         fieldToChar field = case field of
-            Empty -> '.'
-            White -> 'd'
-            Black -> 'a'
-            King -> 'k'
+            Empty       -> '.'
+            Defender    -> 'd'
+            Attacker    -> 'a'
+            King        -> 'k'
         toRows : Board -> List String
         toRows b = b |> Matrix.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
     in
@@ -255,9 +251,9 @@ view model =
                 ]
                 , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
                 , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
-                , div [ errStyle ] [ text model.errorText ]
                 , Html.button [ onClick GetScore ] [ text ("Get score") ]
                 , Html.text model.currentScore
+                , div [ errStyle ] [ text model.errorText ]
             ]
         ]
 
@@ -268,8 +264,8 @@ pickColors f h c =
     (
         case f of
             Empty       -> "peru"
-            White       -> "white"
-            Black       -> "grey"
+            Defender    -> "white"
+            Attacker    -> "grey"
             King        -> "purple"
     ,
         if h then "orange" else if c then "red" else "black"
