@@ -65,6 +65,7 @@ type Msg =
     | GetBoardClicked
     | GetScore | GetScoreAnswer (HttpRes String)
     | BoardResponse (HttpRes Board)
+    | GetMovesResponse (HttpRes (List Location))
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -74,7 +75,7 @@ update msg model =
         insertHistoryIntoModel data = ({model | historyPrev = [], board = List.head data |> withDefault emptyBoard, historyNext = List.tail data |> withDefault []}, Cmd.none)
     in
         case msg of
-            Clicked lc -> (model, Cmd.none)
+            Clicked location -> (model, getPossibleMoves model location)
             LoadHistoryViaHttp -> (model, getHistory)
             NewHistory (Ok h) -> insertHistoryIntoModel h
             NewHistory (Err e) -> handleErr e
@@ -88,6 +89,39 @@ update msg model =
             GetScoreAnswer (Ok x) -> ({model | currentScore = x }, Cmd.none)
             BoardResponse (Err e) -> handleErr e
             BoardResponse (Ok b) -> ( { model | board = b }, Cmd.none)
+            GetMovesResponse (Err e) -> handleErr e
+            GetMovesResponse (Ok locs) -> ( { model | board = highlight model.board locs }, Cmd.none)
+
+highlight : Board -> List Location -> Board
+highlight board = List.foldl (\lc board -> Matrix.update lc (\_ -> Highlighted) board) board
+
+getPossibleMoves : Model -> Location -> Cmd Msg
+getPossibleMoves model location =
+    let
+        jsonBoard = model.board |> boardToJsonValue |> Encode.encode 0
+        jsonLocation = location |> locationToJsonValue |> Encode.encode 0
+        url = "http://localhost:5000/getMoves?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
+
+        locationFromList : List Int -> Location
+        locationFromList lst = case lst of
+            [x, y] -> Matrix.loc x y
+            _ -> Matrix.loc 0 0
+        decodeLocation : Decode.Decoder Location
+        decodeLocation = Decode.list Decode.int |> Decode.andThen (\lst -> lst |> locationFromList |> Decode.succeed)
+
+        listOfMovesDecoder : Decode.Decoder (List Location)
+        listOfMovesDecoder = Decode.list decodeLocation
+        request = Http.get url listOfMovesDecoder
+    in
+        Http.send GetMovesResponse request
+
+locationToJsonValue : Location -> Encode.Value
+locationToJsonValue location = 
+    let
+        x = Matrix.row location
+        y = Matrix.col location
+    in
+        Encode.list [Encode.int x, Encode.int y]
 
 boardListDecoder : Decode.Decoder (List Board)
 boardListDecoder =
@@ -181,42 +215,6 @@ getHistory =
         request = Http.get url boardListDecoder
     in
         Http.send NewHistory request
-
-handleClick : Location -> Model -> Model
-handleClick lc model =
-    let
-        getVal lc mx = Matrix.get lc mx |> withDefault Empty
-        isEmpty lc mx = getVal lc mx == Empty || getVal lc mx == Highlighted
-    in
-        case (model.selected, isEmpty lc model.board) of
-            (Nothing, True)     -> model
-            (Nothing, False)    -> { model | selected = Just lc, board = manageHighlight (Just lc) model.board }
-            (Just slc, True)    -> { model | board = swapCells lc slc model.board |> manageHighlight Nothing, selected = Nothing }
-            (Just slc, False)   -> { model | selected = Just lc, board = manageHighlight (Just lc) model.board}
-
-manageHighlight : Maybe Location -> Board -> Board
-manageHighlight mnewlc b =
-    let
-        removeHighlight = Matrix.map (\e -> if e == Highlighted then Empty else e)
-        highlight lc b =
-            let
-                okRow r = (r == Matrix.row lc)
-                okCol c = (c == Matrix.col lc)
-                toBeHighlighted (r,c) e = (okRow r || okCol c) && e == Empty
-            in
-                Matrix.mapWithLocation (\lc e -> if toBeHighlighted lc e then Highlighted else e) b
-    in
-        case mnewlc of
-            Nothing -> b |> removeHighlight
-            Just newlc -> b |> removeHighlight |> highlight newlc
-
-swapCells : Location -> Location -> Board -> Board
-swapCells lc1 lc2 b =
-    let
-        val1 = Matrix.get lc1 b |> withDefault White
-        val2 = Matrix.get lc2 b |> withDefault White
-    in
-        b |> Matrix.set lc1 val2 |> Matrix.set lc2 val1
 
 
 -- VIEW

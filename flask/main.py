@@ -34,3 +34,12 @@ def getBoard():
         ,".....a....."
         ,"...aaaaa..."]
         )
+
+@app.route('/getMoves', methods=['GET','POST'])
+@cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
+def getMoves():
+    return jsonify(
+        [ [1,1]
+        , [1,2]
+        , [2,2] ]
+        )
