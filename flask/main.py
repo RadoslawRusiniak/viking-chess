@@ -11,6 +11,7 @@ cors = CORS(app, resources={
     , r"/getHistory": {"origins": "http://localhost:5000"}
     , r"/getReachablePositions": {"origins": "http://localhost:5000"}
     , r"/makeMove": {"origins": "http://localhost:5000"}
+    , r"/getHint": {"origins": "http://localhost:5000"}
 })
 
 
@@ -69,3 +70,20 @@ def makeMove():
         ,".....a....."
         ,"...aaaaa..."]
         )
+
+@app.route('/getHint', methods=['GET','POST'])
+@cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
+def getHint():
+    return jsonify(
+    {
+        "hint": {
+            "from": {
+                "row": 5,
+                "column": 5
+            },
+            "to": {
+                "row": 2,
+                "column": 5
+            }
+        }
+    })

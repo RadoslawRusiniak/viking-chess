@@ -54,6 +54,7 @@ subscriptions _ = Sub.none
 -- UPDATE
 
 type alias HttpRes a = Result Http.Error a
+type alias Move = (Location, Location)
 
 type Msg =
       Clicked Location
@@ -65,6 +66,7 @@ type Msg =
     | GetScore | GetScoreAnswer (HttpRes String)
     | GetMovesResponse (HttpRes (List Location))
     | MakeMoveResponse (HttpRes Board)
+    | GetHint | GetHintResponse (HttpRes Move)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -119,9 +121,26 @@ update msg model =
             MakeMoveResponse (Ok b) -> ( { model | errorText = "", board = b, possibleMoves = Nothing, 
                                          historyPrev = model.board :: model.historyPrev,
                                          historyNext = [] }, Cmd.none)
+            GetHint -> (model, getHint model.board)
+            GetHintResponse (Err e) -> handleErr e
+            GetHintResponse (Ok (from, to)) -> ( { model | clickedLocation = Just from, possibleMoves = Just [to] }, Cmd.none)
 
 server : String
 server = "http://localhost:5000/"
+
+getHint : Board -> Cmd Msg
+getHint board = 
+    let
+        jsonBoard = board |> boardToJsonValue |> Encode.encode 0
+
+        moveDecoder : Decode.Decoder Move
+        moveDecoder = Decode.map2 (\a b -> (a,b)) (Decode.field "from" locationDecoder) (Decode.field "to" locationDecoder)
+        hintDecoder = Decode.field "hint" moveDecoder
+
+        url = server ++ "getHint" ++ "?board=" ++ jsonBoard
+        request = Http.get url hintDecoder
+    in
+        Http.send GetHintResponse request
 
 getHistory : Cmd Msg
 getHistory =
@@ -149,9 +168,6 @@ getReachablePositions board location =
         jsonLocation = location |> locationToJsonValue |> Encode.encode 0
         url = server ++ "getReachablePositions?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
 
-        locationDecoder : Decode.Decoder Location
-        locationDecoder = Decode.map2 Matrix.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
-
         listOfMovesDecoder : Decode.Decoder (List Location)
         listOfMovesDecoder = Decode.field "positions" (Decode.list locationDecoder)
         request = Http.get url listOfMovesDecoder
@@ -171,6 +187,9 @@ getCurrentScore model =
 
 loadHistoryFromTextArea : String -> List Board
 loadHistoryFromTextArea s = s |> Decode.decodeString boardListDecoder |> Result.toMaybe |> withDefault []
+
+locationDecoder : Decode.Decoder Location
+locationDecoder = Decode.map2 Matrix.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
 
 boardDecoder : Decode.Decoder Board
 boardDecoder =
@@ -253,6 +272,7 @@ view model =
                 , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
                 , Html.button [ onClick GetScore ] [ text ("Get score") ]
                 , Html.text model.currentScore
+                , Html.button [ onClick GetHint ] [ text ("Get hint") ]
                 , div [ errStyle ] [ text model.errorText ]
             ]
         ]
