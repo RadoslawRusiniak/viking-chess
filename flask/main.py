@@ -43,3 +43,20 @@ def getMoves():
         , [1,2]
         , [2,2] ]
         )
+
+@app.route('/makeMove', methods=['GET','POST'])
+@cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
+def makeMove():
+    return jsonify(
+        ["...aaaaa..."
+        ,"..a........"
+        ,"..........."
+        ,"a....d....a"
+        ,"a...ddd...a"
+        ,"aa.ddkdd.aa"
+        ,"a...ddd...a"
+        ,"a....d....a"
+        ,"..........."
+        ,".....a....."
+        ,"...aaaaa..."]
+        )
