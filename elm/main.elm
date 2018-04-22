@@ -26,12 +26,11 @@ type Field = Empty | Highlighted | White | Black | King
 type alias Board = Matrix Field
 type alias Model =
     { board : Board
-    , selected : Maybe Location
+    , possibleMoves : Maybe (List Location)
     , historyPrev : List Board
     , historyNext : List Board
     , textareavalue : String
     , errorText : String
-    , whoStartsVal : String
     , currentScore : String
     }
 
@@ -44,7 +43,6 @@ init =
         []
         ""
         ""
-        "0"
         ""
     , getBoard)
 
@@ -66,6 +64,7 @@ type Msg =
     | GetScore | GetScoreAnswer (HttpRes String)
     | BoardResponse (HttpRes Board)
     | GetMovesResponse (HttpRes (List Location))
+    | MakeMoveResponse (HttpRes Board)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -75,7 +74,7 @@ update msg model =
         insertHistoryIntoModel data = ({model | historyPrev = [], board = List.head data |> withDefault emptyBoard, historyNext = List.tail data |> withDefault []}, Cmd.none)
     in
         case msg of
-            Clicked location -> (model, getPossibleMoves model location)
+            Clicked location -> (model, handleClick model location)
             LoadHistoryViaHttp -> (model, getHistory)
             NewHistory (Ok h) -> insertHistoryIntoModel h
             NewHistory (Err e) -> handleErr e
@@ -90,15 +89,34 @@ update msg model =
             BoardResponse (Err e) -> handleErr e
             BoardResponse (Ok b) -> ( { model | board = b }, Cmd.none)
             GetMovesResponse (Err e) -> handleErr e
-            GetMovesResponse (Ok locs) -> ( { model | board = highlight model.board locs }, Cmd.none)
+            GetMovesResponse (Ok locs) -> ( { model | board = highlight model.board locs, possibleMoves = Just locs }, Cmd.none)
+            MakeMoveResponse (Err e) -> handleErr e
+            MakeMoveResponse (Ok b) -> ( { model | board = b, possibleMoves = Nothing }, Cmd.none)
+
+handleClick : Model -> Location -> Cmd Msg
+handleClick model location = case model.possibleMoves of
+    Nothing -> getPossibleMoves model.board location
+    Just _ -> makeMove model.board location
+
+makeMove : Board -> Location -> Cmd Msg
+makeMove board location =
+    let
+        jsonBoard = board |> boardToJsonValue |> Encode.encode 0
+        jsonLocation = location |> locationToJsonValue |> Encode.encode 0
+        uri = "http://localhost:5000/makeMove?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
+
+        request = Http.get uri boardDecoder
+    in
+        Http.send MakeMoveResponse request
+        
 
 highlight : Board -> List Location -> Board
 highlight board = List.foldl (\lc board -> Matrix.update lc (\_ -> Highlighted) board) board
 
-getPossibleMoves : Model -> Location -> Cmd Msg
-getPossibleMoves model location =
+getPossibleMoves : Board -> Location -> Cmd Msg
+getPossibleMoves board location =
     let
-        jsonBoard = model.board |> boardToJsonValue |> Encode.encode 0
+        jsonBoard = board |> boardToJsonValue |> Encode.encode 0
         jsonLocation = location |> locationToJsonValue |> Encode.encode 0
         url = "http://localhost:5000/getMoves?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
 

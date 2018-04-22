@@ -29,6 +29,7 @@ Prerequisites:
 Running:
 
 1. Run elm:
+
   1.1. Navigate to elm subdirectory:
 
     cd elm

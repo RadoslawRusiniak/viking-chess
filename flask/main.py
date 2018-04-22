@@ -9,6 +9,8 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 cors = CORS(app, resources={
     r"/getScore": {"origins": "http://localhost:5000"}
     , r"/getBoard": {"origins": "http://localhost:5000"}
+    , r"/getMoves": {"origins": "http://localhost:5000"}
+    , r"/makeMove": {"origins": "http://localhost:5000"}
 })
 
 
