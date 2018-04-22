@@ -8,6 +8,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Http
 
+main : Program Never Model Msg
 main =
   Html.program
     { init = init
@@ -67,27 +68,40 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     let
         handleErr e = ({ model | errorText = toString e}, Cmd.none)
-        emptyBoard = Matrix.square 0 (\_ -> Empty)
-        getHead lst = List.head lst |> withDefault emptyBoard
+
+        getHead lst =
+            let
+                emptyBoard = Matrix.square 0 (\_ -> Empty)
+            in
+                List.head lst |> withDefault emptyBoard
         getTail lst = List.tail lst |> withDefault []
         insertHistoryIntoModel data = 
             let
                 rdata = List.reverse data
             in
                 ( {model | historyPrev = getTail rdata, board = getHead rdata}, Cmd.none)
+
         highlight board = List.foldl (\lc brd -> Matrix.update lc (\_ -> Highlighted) brd) board
         unhighlight = Matrix.map (\el -> if el == Highlighted then Empty else el)
+
         zipNext m = {m | historyPrev = m.board :: m.historyPrev, board = getHead m.historyNext,
                          historyNext = getTail m.historyNext}
         zipPrev m = {m | historyPrev = getTail m.historyPrev, board = getHead m.historyPrev,
                          historyNext = m.board :: m.historyNext}
+
+        handleClick model location = case model.possibleMoves of
+            Nothing -> (model, getPossibleMoves model.board location)
+            Just moves -> 
+                case List.member location moves of
+                    True -> (model, makeMove model.board location)
+                    False -> ( { model | errorText = "Wrong move" }, Cmd.none)
     in
         case msg of
-            Clicked location -> (model, handleClick model location)
+            Clicked location -> handleClick model location
             LoadHistoryViaHttp -> (model, getHistory)
             LoadHistoryResponse (Err e) -> handleErr e
             LoadHistoryResponse (Ok h) -> insertHistoryIntoModel h
-            UpdateTextAreaValue v -> ( { model | textareavalue = v}, Cmd.none)
+            UpdateTextAreaValue v -> ( { model | textareavalue = v }, Cmd.none)
             LoadHistoryFromTextArea -> loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel
             Next -> (zipNext model, Cmd.none)
             Prev -> (zipPrev model, Cmd.none)
@@ -102,25 +116,23 @@ update msg model =
                                          historyPrev = (unhighlight model.board) :: model.historyPrev,
                                          historyNext = [] }, Cmd.none)
 
+server : String
+server = "http://localhost:5000/"
+
 getHistory : Cmd Msg
 getHistory =
     let
-        url = "http://localhost:5000/getHistory"
+        url = server ++ "getHistory"
         request = Http.get url boardListDecoder
     in
         Http.send LoadHistoryResponse request
-
-handleClick : Model -> Location -> Cmd Msg
-handleClick model location = case model.possibleMoves of
-    Nothing -> getPossibleMoves model.board location
-    Just _ -> makeMove model.board location
 
 makeMove : Board -> Location -> Cmd Msg
 makeMove board location =
     let
         jsonBoard = board |> boardToJsonValue |> Encode.encode 0
         jsonLocation = location |> locationToJsonValue |> Encode.encode 0
-        uri = "http://localhost:5000/makeMove?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
+        uri = server ++ "makeMove?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
 
         request = Http.get uri boardDecoder
     in
@@ -131,7 +143,7 @@ getPossibleMoves board location =
     let
         jsonBoard = board |> boardToJsonValue |> Encode.encode 0
         jsonLocation = location |> locationToJsonValue |> Encode.encode 0
-        url = "http://localhost:5000/getMoves?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
+        url = server ++ "getMoves?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
 
         locationFromList : List Int -> Location
         locationFromList lst = case lst of
@@ -150,7 +162,7 @@ getCurrentScore : Model -> Cmd Msg
 getCurrentScore model =
     let
         jsonVal = boardToJsonValue model.board
-        url = "http://localhost:5000/getScore?board=" ++ (Encode.encode 0 jsonVal)
+        url = server ++ "getScore?board=" ++ (Encode.encode 0 jsonVal)
         getScoreDecoder : Decode.Decoder String
         getScoreDecoder = Decode.string
         request = Http.get url getScoreDecoder
