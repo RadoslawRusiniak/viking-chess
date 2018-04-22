@@ -26,6 +26,7 @@ type Field = Empty | Highlighted | White | Black | King
 type alias Board = Matrix Field
 type alias Model =
     { board : Board
+    , clickedLocation : Maybe Location
     , possibleMoves : Maybe (List Location)
     , historyPrev : List Board
     , historyNext : List Board
@@ -38,6 +39,7 @@ init : (Model, Cmd Msg)
 init =
     (Model
         (square 11 (\_ -> Empty))
+        Nothing
         Nothing
         []
         []
@@ -74,14 +76,16 @@ update msg model =
                 emptyBoard = Matrix.square 0 (\_ -> Empty)
             in
                 List.head lst |> withDefault emptyBoard
+
         getTail lst = List.tail lst |> withDefault []
+
         insertHistoryIntoModel data = 
             let
                 rdata = List.reverse data
             in
                 ( {model | historyPrev = getTail rdata, board = getHead rdata}, Cmd.none)
 
-        highlight board = List.foldl (\lc brd -> Matrix.update lc (\_ -> Highlighted) brd) board
+        highlight = List.foldl (\lc brd -> Matrix.update lc (\_ -> Highlighted) brd)
         unhighlight = Matrix.map (\el -> if el == Highlighted then Empty else el)
 
         zipNext m = {m | historyPrev = m.board :: m.historyPrev, board = getHead m.historyNext,
@@ -89,12 +93,14 @@ update msg model =
         zipPrev m = {m | historyPrev = getTail m.historyPrev, board = getHead m.historyPrev,
                          historyNext = m.board :: m.historyNext}
 
-        handleClick model location = case model.possibleMoves of
-            Nothing -> (model, getPossibleMoves model.board location)
-            Just moves -> 
-                case List.member location moves of
-                    True -> (model, makeMove model.board location)
-                    False -> ( { model | errorText = "Wrong move" }, Cmd.none)
+        handleClick : Model -> Location -> (Model, Cmd Msg)
+        handleClick model location =
+            case model.clickedLocation of
+                Nothing -> ( { model | clickedLocation = Just location }, getPossibleMoves model.board location)
+                Just moves -> 
+                    case List.member location (model.possibleMoves |> withDefault []) of
+                        True -> ( { model | clickedLocation = Nothing }, makeMove model.board location)
+                        False -> ( { model | errorText = "Wrong move" }, Cmd.none)
     in
         case msg of
             Clicked location -> handleClick model location
@@ -267,10 +273,10 @@ errStyle = style [
 
 myStyle : String -> Attribute Msg
 myStyle clr =
-  style
-    [ ("backgroundColor", clr)
-    , ("height", "50px")
-    , ("width", "50px")
-    , ("border", "2px black solid")
-    , ("display", "inline-block")
-    ]
+    style
+        [ ("backgroundColor", clr)
+        , ("height", "50px")
+        , ("width", "50px")
+        , ("border", "2px solid black")
+        , ("display", "inline-block")
+        ]
