@@ -21,7 +21,7 @@ main =
 -- MODEL
 
 
-type Field = Empty | Highlighted | White | Black | King
+type Field = Empty | White | Black | King
 
 type alias Board = Matrix Field
 type alias Model =
@@ -83,10 +83,8 @@ update msg model =
             let
                 rdata = List.reverse data
             in
-                ( {model | historyPrev = getTail rdata, board = getHead rdata}, Cmd.none)
-
-        highlight = List.foldl (\lc brd -> Matrix.update lc (\_ -> Highlighted) brd)
-        unhighlight = Matrix.map (\el -> if el == Highlighted then Empty else el)
+                ( {model | historyPrev = getTail rdata, board = getHead rdata, historyNext = [],
+                 clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none)
 
         zipNext m = {m | historyPrev = m.board :: m.historyPrev, board = getHead m.historyNext,
                          historyNext = getTail m.historyNext}
@@ -115,11 +113,11 @@ update msg model =
             GetScoreAnswer (Err e) -> handleErr e
             GetScoreAnswer (Ok x) -> ( { model | currentScore = x }, Cmd.none)
             GetMovesResponse (Err e) -> handleErr e
-            GetMovesResponse (Ok locs) -> ( { model | board = highlight model.board locs, possibleMoves = Just locs },
+            GetMovesResponse (Ok locs) -> ( { model | board = model.board, possibleMoves = Just locs },
                                             Cmd.none)
             MakeMoveResponse (Err e) -> handleErr e
-            MakeMoveResponse (Ok b) -> ( { model | board = b, possibleMoves = Nothing, 
-                                         historyPrev = (unhighlight model.board) :: model.historyPrev,
+            MakeMoveResponse (Ok b) -> ( { model | errorText = "", board = b, possibleMoves = Nothing, 
+                                         historyPrev = model.board :: model.historyPrev,
                                          historyNext = [] }, Cmd.none)
 
 server : String
@@ -181,8 +179,7 @@ loadHistoryFromTextArea s = s |> Decode.decodeString boardListDecoder |> Result.
 boardDecoder : Decode.Decoder Board
 boardDecoder =
     let
-        charToField : Char -> Field
-        charToField c = case c of
+        charToField c =  case c of
             '.' -> Empty
             'a' -> Black
             'd' -> White
@@ -211,13 +208,11 @@ locationToJsonValue location =
 boardToJsonValue : Board -> Encode.Value
 boardToJsonValue b =
     let
-        fieldToChar field =
-            case field of
-                Empty -> '.'
-                Highlighted -> '.'
-                White -> 'd'
-                Black -> 'a'
-                King -> 'k'
+        fieldToChar field = case field of
+            Empty -> '.'
+            White -> 'd'
+            Black -> 'a'
+            King -> 'k'
         toRows : Board -> List String
         toRows b = b |> Matrix.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
     in
@@ -229,41 +224,56 @@ boardToJsonValue b =
 
 view : Model -> Html Msg
 view model =
-    div [ style [("display", "flex"), ("flex-direction", "row")] ] [
-        div [] (
-            model.board
-                |> Matrix.mapWithLocation (\lc e -> div [ myStyle (pickColor e), onClick (Clicked lc) ] [])
-                |> Matrix.toList
-                |> List.map (div [])
-        )
-        , div [] [
-            Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
+    let
+        isHighlighted lc = case model.possibleMoves of
+            Nothing -> False
+            Just moves -> List.member lc moves
+        isClicked lc = case model.clickedLocation of
+            Nothing -> False
+            Just clicked -> lc == clicked
+        fieldColors elem location = pickColors elem (isHighlighted location) (isClicked location) 
+    in
+        div [ style [("display", "flex"), ("flex-direction", "row")] ] [
+            div [] (
+                model.board
+                    |> Matrix.mapWithLocation (\loc elem -> div [ myStyle (fieldColors elem loc), onClick (Clicked loc) ] [])
+                    |> Matrix.toList
+                    |> List.map (div [ style [("height", "56px")]])
+            )
             , div [] [
-                Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ] [
-                    Html.textarea [ Html.Events.onInput UpdateTextAreaValue ] []
-                    ,             
-                    button
-                        [ Html.Attributes.type_ "submit"
-                            , Html.Attributes.disabled False
-                        ]
-                        [ text "Load history from textarea" ]
+                Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
+                , div [] [
+                    Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ] [
+                        Html.textarea [ Html.Events.onInput UpdateTextAreaValue ] []
+                        ,             
+                        button
+                            [ Html.Attributes.type_ "submit"
+                                , Html.Attributes.disabled False
+                            ]
+                            [ text "Load history from textarea" ]
+                    ]
                 ]
+                , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
+                , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
+                , div [ errStyle ] [ text model.errorText ]
+                , Html.button [ onClick GetScore ] [ text ("Get score") ]
+                , Html.text model.currentScore
             ]
-            , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
-            , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
-            , div [ errStyle ] [ text model.errorText ]
-            , Html.button [ onClick GetScore ] [ text ("Get score") ]
-            , Html.text model.currentScore
         ]
-    ]
 
-pickColor : Field -> String
-pickColor f = case f of
-    Empty       -> "peru"
-    White       -> "white"
-    Black       -> "black"
-    Highlighted -> "orange"
-    King        -> "purple"
+type alias IsHighlighted = Bool
+type alias IsClicked = Bool
+pickColors : Field -> IsHighlighted -> IsClicked -> (String, String)
+pickColors f h c = 
+    (
+        case f of
+            Empty       -> "peru"
+            White       -> "white"
+            Black       -> "grey"
+            King        -> "purple"
+    ,
+        if h then "orange" else if c then "red" else "black"
+    )
 
 errStyle : Attribute Msg
 errStyle = style [
@@ -271,12 +281,12 @@ errStyle = style [
     , ("width", "100px")
     ]
 
-myStyle : String -> Attribute Msg
-myStyle clr =
+myStyle : (String, String) -> Attribute Msg
+myStyle (background, border) =
     style
-        [ ("backgroundColor", clr)
+        [ ("backgroundColor", background)
         , ("height", "50px")
         , ("width", "50px")
-        , ("border", "2px solid black")
+        , ("border", "3px solid " ++ border)
         , ("display", "inline-block")
         ]
