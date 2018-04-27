@@ -32,7 +32,7 @@ type alias Model =
     , historyNext : List Board
     , textareavalue : String
     , errorText : String
-    , currentScore : String
+    , currentScore : Float
     }
 
 init : (Model, Cmd Msg)
@@ -45,7 +45,7 @@ init =
         []
         ""
         ""
-        ""
+        0
     , getHistory)
 
 subscriptions : Model -> Sub Msg
@@ -63,7 +63,7 @@ type Msg =
     | UpdateTextAreaValue String
     | LoadHistoryFromTextArea
     | Next | Prev
-    | GetScore | GetScoreAnswer (HttpRes String)
+    | GetScore | GetScoreAnswer (HttpRes Float)
     | GetMovesResponse (HttpRes (List Location))
     | MakeMoveResponse (HttpRes Board)
     | GetHint | GetHintResponse (HttpRes Move)
@@ -179,8 +179,8 @@ getCurrentScore model =
     let
         jsonVal = boardToJsonValue model.board
         url = server ++ "getScore?board=" ++ (Encode.encode 0 jsonVal)
-        getScoreDecoder : Decode.Decoder String
-        getScoreDecoder = Decode.string
+        getScoreDecoder : Decode.Decoder Float
+        getScoreDecoder = Decode.field "score" Decode.float
         request = Http.get url getScoreDecoder
     in
         Http.send GetScoreAnswer request
@@ -206,11 +206,13 @@ boardDecoder =
         decodeFieldsRow = Decode.string |> Decode.andThen (\x -> x |> stringToFields |> Decode.succeed)
         decode2DList : Decode.Decoder (List (List Field))
         decode2DList = Decode.list decodeFieldsRow
+        decodeBoard : Decode.Decoder Board
+        decodeBoard = decode2DList |> Decode.andThen (\l -> l |> Matrix.fromList |> Decode.succeed)
     in
-        decode2DList |> Decode.andThen (\l -> l |> Matrix.fromList |> Decode.succeed)
+        Decode.field "board" decodeBoard
 
 boardListDecoder : Decode.Decoder (List Board)
-boardListDecoder = Decode.list boardDecoder
+boardListDecoder = Decode.field "history" (Decode.list boardDecoder)
 
 locationToJsonValue : Location -> Encode.Value
 locationToJsonValue location = 
@@ -271,7 +273,7 @@ view model =
                 , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
                 , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
                 , Html.button [ onClick GetScore ] [ text ("Get score") ]
-                , Html.text model.currentScore
+                , Html.text (toString model.currentScore)
                 , Html.button [ onClick GetHint ] [ text ("Get hint") ]
                 , div [ errStyle ] [ text model.errorText ]
             ]

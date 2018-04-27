@@ -18,27 +18,49 @@ cors = CORS(app, resources={
 @app.route('/getScore', methods=['GET','POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getScore():
-    return jsonify("3")
+    return jsonify(
+    {
+        "score": 3
+    })
 
 
 @app.route('/getHistory', methods=['GET','POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getBoard():
     return jsonify(
-        [
-            ["...aaaaa..."
-            ,".....a....."
-            ,"..........."
-            ,"a....d....a"
-            ,"a...ddd...a"
-            ,"aa.ddkdd.aa"
-            ,"a...ddd...a"
-            ,"a....d....a"
-            ,"..........."
-            ,".....a....."
-            ,"...aaaaa..."]
-        ]
-        )
+        {
+            "history":
+            [
+                {
+                    "board":
+                        ["...aaaaa..."
+                        ,".....a....."
+                        ,"..........."
+                        ,"a....d....a"
+                        ,"a...ddd...a"
+                        ,"aa.ddkdd.aa"
+                        ,"a...ddd...a"
+                        ,"a....d....a"
+                        ,"..........."
+                        ,".....a....."
+                        ,"...aaaaa..."]
+                },
+                {
+                    "board":
+                        ["...aaaaa..."
+                        ,".....a....."
+                        ,"..........."
+                        ,"a....d....a"
+                        ,"..a.ddd...a"
+                        ,"aa.ddkdd.aa"
+                        ,"a...ddd...a"
+                        ,"a....d....a"
+                        ,"..........."
+                        ,".....a....."
+                        ,"...aaaaa..."]
+                }
+            ]
+        })
 
 @app.route('/getReachablePositions', methods=['GET','POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
@@ -58,18 +80,20 @@ def getMoves():
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def makeMove():
     return jsonify(
-        ["...aaaaa..."
-        ,"..a........"
-        ,"..........."
-        ,"a....d....a"
-        ,"a...ddd...a"
-        ,"aa.ddkdd.aa"
-        ,"a...ddd...a"
-        ,"a....d....a"
-        ,"..........."
-        ,".....a....."
-        ,"...aaaaa..."]
-        )
+        {
+            "board":    
+                ["...aaaaa..."
+                ,"..a........"
+                ,"..........."
+                ,"a....d....a"
+                ,"a...ddd...a"
+                ,"aa.ddkdd.aa"
+                ,"a...ddd...a"
+                ,"a....d....a"
+                ,"..........."
+                ,".....a....."
+                ,"...aaaaa..."]
+        })
 
 @app.route('/getHint', methods=['GET','POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
