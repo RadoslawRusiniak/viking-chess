@@ -217,10 +217,15 @@ boardListDecoder = Decode.field "history" (Decode.list boardDecoder)
 locationToJsonValue : Location -> Encode.Value
 locationToJsonValue location = 
     let
-        x = Matrix.row location
-        y = Matrix.col location
+        asObject loc = 
+            let
+                x = Matrix.row loc |> Encode.int
+                y = Matrix.col loc |> Encode.int
+            in
+                Encode.object [("row", x), ("column", y)]
+        asLocationObject loc = Encode.object [("location", loc)]
     in
-        Encode.list [Encode.int x, Encode.int y]
+        location |> asObject |> asLocationObject 
 
 boardToJsonValue : Board -> Encode.Value
 boardToJsonValue b =
@@ -232,8 +237,9 @@ boardToJsonValue b =
             King        -> 'k'
         toRows : Board -> List String
         toRows b = b |> Matrix.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
+        asObject b = Encode.object [("board", b)]
     in
-        b |> toRows |> List.map Encode.string |> Encode.list
+        b |> toRows |> List.map Encode.string |> Encode.list |> asObject
 
 
 -- VIEW
