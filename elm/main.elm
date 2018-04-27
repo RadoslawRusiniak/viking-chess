@@ -100,7 +100,7 @@ update msg model =
                 Just moves -> 
                     case List.member location (model.possibleMoves |> withDefault []) of
                         True -> ( { model | clickedLocation = Nothing }, makeMove model.board location)
-                        False -> ( { model | errorText = "Wrong move" }, Cmd.none)
+                        False -> ( { model | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none)
     in
         case msg of
             Clicked location -> handleClick model location
