@@ -24,12 +24,14 @@ main =
 type Field = Empty | Defender | Attacker | King
 
 type alias Board = Matrix Field
+type alias WhoMoves = Int
+type alias GameState = (Board, WhoMoves)
 type alias Model =
-    { board : Board
+    { state : GameState
     , clickedLocation : Maybe Location
     , possibleMoves : Maybe (List Location)
-    , historyPrev : List Board
-    , historyNext : List Board
+    , historyPrev : List GameState
+    , historyNext : List GameState
     , textareavalue : String
     , errorText : String
     , currentScore : Float
@@ -38,7 +40,7 @@ type alias Model =
 init : (Model, Cmd Msg)
 init =
     (Model
-        (square 11 (\_ -> Empty))
+        (square 11 (\_ -> Empty), 1)
         Nothing
         Nothing
         []
@@ -59,13 +61,13 @@ type alias Move = (Location, Location)
 type Msg =
       Clicked Location
     | LoadHistoryViaHttp
-    | LoadHistoryResponse (HttpRes (List Board))
+    | LoadHistoryResponse (HttpRes (List GameState))
     | UpdateTextAreaValue String
     | LoadHistoryFromTextArea
     | Next | Prev
-    | GetScore | GetScoreAnswer (HttpRes Float)
+    | GetScore | GetScoreResponse (HttpRes Float)
     | GetMovesResponse (HttpRes (List Location))
-    | MakeMoveResponse (HttpRes Board)
+    | MakeMoveResponse (HttpRes GameState)
     | GetHint | GetHintResponse (HttpRes Move)
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -75,9 +77,9 @@ update msg model =
 
         getHead lst =
             let
-                emptyBoard = Matrix.square 0 (\_ -> Empty)
+                emptyState = (Matrix.square 0 (\_ -> Empty), 0)
             in
-                List.head lst |> withDefault emptyBoard
+                List.head lst |> withDefault emptyState
 
         getTail lst = List.tail lst |> withDefault []
 
@@ -85,21 +87,22 @@ update msg model =
             let
                 rdata = List.reverse data
             in
-                ( {model | historyPrev = getTail rdata, board = getHead rdata, historyNext = [],
+                ( {model | historyPrev = getTail rdata, state = getHead rdata, historyNext = [],
                  clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none)
 
-        zipNext m = {m | historyPrev = m.board :: m.historyPrev, board = getHead m.historyNext,
+        zipNext m = {m | historyPrev = m.state :: m.historyPrev, state = getHead m.historyNext,
                          historyNext = getTail m.historyNext}
-        zipPrev m = {m | historyPrev = getTail m.historyPrev, board = getHead m.historyPrev,
-                         historyNext = m.board :: m.historyNext}
+        zipPrev m = {m | historyPrev = getTail m.historyPrev, state = getHead m.historyPrev,
+                         historyNext = m.state :: m.historyNext}
 
         handleClick : Model -> Location -> (Model, Cmd Msg)
         handleClick model location =
             case model.clickedLocation of
-                Nothing -> ( { model | clickedLocation = Just location }, getReachablePositions model.board location)
+                Nothing -> ( { model | clickedLocation = Just location },
+                            getReachablePositions model.state location)
                 Just moves -> 
                     case List.member location (model.possibleMoves |> withDefault []) of
-                        True -> ( { model | clickedLocation = Nothing }, makeMove model.board location)
+                        True -> ( { model | clickedLocation = Nothing }, makeMove model.state location)
                         False -> ( { model | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none)
     in
         case msg of
@@ -111,33 +114,34 @@ update msg model =
             LoadHistoryFromTextArea -> loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel
             Next -> (zipNext model, Cmd.none)
             Prev -> (zipPrev model, Cmd.none)
-            GetScore -> (model, getCurrentScore model)
-            GetScoreAnswer (Err e) -> handleErr e
-            GetScoreAnswer (Ok x) -> ( { model | currentScore = x }, Cmd.none)
+            GetScore -> (model, getCurrentScore model.state)
+            GetScoreResponse (Err e) -> handleErr e
+            GetScoreResponse (Ok x) -> ( { model | currentScore = x }, Cmd.none)
             GetMovesResponse (Err e) -> handleErr e
-            GetMovesResponse (Ok locs) -> ( { model | board = model.board, possibleMoves = Just locs },
+            GetMovesResponse (Ok locs) -> ( { model | possibleMoves = Just locs },
                                             Cmd.none)
             MakeMoveResponse (Err e) -> handleErr e
-            MakeMoveResponse (Ok b) -> ( { model | errorText = "", board = b, possibleMoves = Nothing, 
-                                         historyPrev = model.board :: model.historyPrev,
+            MakeMoveResponse (Ok s) -> ( { model | errorText = "", state = s, possibleMoves = Nothing, 
+                                         historyPrev = model.state :: model.historyPrev,
                                          historyNext = [] }, Cmd.none)
-            GetHint -> (model, getHint model.board)
+            GetHint -> (model, getHint model.state)
             GetHintResponse (Err e) -> handleErr e
-            GetHintResponse (Ok (from, to)) -> ( { model | clickedLocation = Just from, possibleMoves = Just [to] }, Cmd.none)
+            GetHintResponse (Ok (from, to)) -> ( { model | clickedLocation = Just from, possibleMoves = Just [to] },
+                                                Cmd.none)
 
 server : String
 server = "http://localhost:5000/"
 
-getHint : Board -> Cmd Msg
-getHint board = 
+getHint : GameState -> Cmd Msg
+getHint state = 
     let
-        jsonBoard = board |> boardToJsonValue |> Encode.encode 0
+        jsonState = stateToJsonValue state |> Encode.encode 0
 
         moveDecoder : Decode.Decoder Move
-        moveDecoder = Decode.map2 (\a b -> (a,b)) (Decode.field "from" locationDecoder) (Decode.field "to" locationDecoder)
+        moveDecoder = Decode.map2 ((,)) (Decode.field "from" locationDecoder) (Decode.field "to" locationDecoder)
         hintDecoder = Decode.field "hint" moveDecoder
 
-        url = server ++ "getHint" ++ "?board=" ++ jsonBoard
+        url = server ++ "getHint" ++ "?state=" ++ jsonState
         request = Http.get url hintDecoder
     in
         Http.send GetHintResponse request
@@ -146,27 +150,27 @@ getHistory : Cmd Msg
 getHistory =
     let
         url = server ++ "getHistory"
-        request = Http.get url boardListDecoder
+        request = Http.get url gameStateListDecoder
     in
         Http.send LoadHistoryResponse request
 
-makeMove : Board -> Location -> Cmd Msg
-makeMove board location =
+makeMove : GameState -> Location -> Cmd Msg
+makeMove state location =
     let
-        jsonBoard = board |> boardToJsonValue |> Encode.encode 0
+        jsonState = stateToJsonValue state |> Encode.encode 0
         jsonLocation = location |> locationToJsonValue |> Encode.encode 0
-        uri = server ++ "makeMove?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
+        uri = server ++ "makeMove?state=" ++ jsonState ++ "&location=" ++ jsonLocation
 
-        request = Http.get uri boardDecoder
+        request = Http.get uri gameStateDecoder
     in
         Http.send MakeMoveResponse request
 
-getReachablePositions : Board -> Location -> Cmd Msg
-getReachablePositions board location =
+getReachablePositions : GameState -> Location -> Cmd Msg
+getReachablePositions state location =
     let
-        jsonBoard = board |> boardToJsonValue |> Encode.encode 0
+        jsonState = stateToJsonValue state |> Encode.encode 0
         jsonLocation = location |> locationToJsonValue |> Encode.encode 0
-        url = server ++ "getReachablePositions?board=" ++ jsonBoard ++ "&location=" ++ jsonLocation
+        url = server ++ "getReachablePositions?state=" ++ jsonState ++ "&location=" ++ jsonLocation
 
         listOfMovesDecoder : Decode.Decoder (List Location)
         listOfMovesDecoder = Decode.field "positions" (Decode.list locationDecoder)
@@ -174,25 +178,25 @@ getReachablePositions board location =
     in
         Http.send GetMovesResponse request
 
-getCurrentScore : Model -> Cmd Msg
-getCurrentScore model =
+getCurrentScore : GameState -> Cmd Msg
+getCurrentScore state =
     let
-        jsonVal = boardToJsonValue model.board
-        url = server ++ "getScore?board=" ++ (Encode.encode 0 jsonVal)
+        jsonVal = stateToJsonValue state
+        url = server ++ "getScore?state=" ++ (Encode.encode 0 jsonVal)
         getScoreDecoder : Decode.Decoder Float
         getScoreDecoder = Decode.field "score" Decode.float
         request = Http.get url getScoreDecoder
     in
-        Http.send GetScoreAnswer request
+        Http.send GetScoreResponse request
 
-loadHistoryFromTextArea : String -> List Board
-loadHistoryFromTextArea s = s |> Decode.decodeString boardListDecoder |> Result.toMaybe |> withDefault []
+loadHistoryFromTextArea : String -> List GameState
+loadHistoryFromTextArea s = s |> Decode.decodeString gameStateListDecoder |> Result.toMaybe |> withDefault []
 
 locationDecoder : Decode.Decoder Location
 locationDecoder = Decode.map2 Matrix.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
 
-boardDecoder : Decode.Decoder Board
-boardDecoder =
+gameStateDecoder : Decode.Decoder GameState
+gameStateDecoder =
     let
         charToField c =  case c of
             '.' -> Empty
@@ -208,11 +212,13 @@ boardDecoder =
         decode2DList = Decode.list decodeFieldsRow
         decodeBoard : Decode.Decoder Board
         decodeBoard = decode2DList |> Decode.andThen (\l -> l |> Matrix.fromList |> Decode.succeed)
+        decodeFieldBoard = Decode.field "board" decodeBoard
+        decodeFieldWhoMoves = Decode.field "whoMoves" Decode.int
     in
-        Decode.field "board" decodeBoard
+        Decode.map2 (\a b -> (a,b)) decodeFieldBoard decodeFieldWhoMoves
 
-boardListDecoder : Decode.Decoder (List Board)
-boardListDecoder = Decode.field "history" (Decode.list boardDecoder)
+gameStateListDecoder : Decode.Decoder (List GameState)
+gameStateListDecoder = Decode.field "history" (Decode.list gameStateDecoder)
 
 locationToJsonValue : Location -> Encode.Value
 locationToJsonValue location = 
@@ -227,8 +233,8 @@ locationToJsonValue location =
     in
         location |> asObject |> asLocationObject 
 
-boardToJsonValue : Board -> Encode.Value
-boardToJsonValue b =
+stateToJsonValue : GameState -> Encode.Value
+stateToJsonValue (b, who) =
     let
         fieldToChar field = case field of
             Empty       -> '.'
@@ -237,10 +243,10 @@ boardToJsonValue b =
             King        -> 'k'
         toRows : Board -> List String
         toRows b = b |> Matrix.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
-        asObject b = Encode.object [("board", b)]
+        boardToJsonValue b = b |> toRows |> List.map Encode.string |> Encode.list
+        whoToJsonValue = Encode.int
     in
-        b |> toRows |> List.map Encode.string |> Encode.list |> asObject
-
+        Encode.object [("board", boardToJsonValue b), ("whoMoves", whoToJsonValue who)]
 
 -- VIEW
 
@@ -258,13 +264,14 @@ view model =
     in
         div [ style [("display", "flex"), ("flex-direction", "row")] ] [
             div [] (
-                model.board
+                model.state |> Tuple.first
                     |> Matrix.mapWithLocation (\loc elem -> div [ myStyle (fieldColors elem loc), onClick (Clicked loc) ] [])
                     |> Matrix.toList
                     |> List.map (div [ style [("height", "56px")]])
             )
             , div [] [
-                Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
+                Html.text ("Now moves: " ++ toString (Tuple.second model.state)), Html.br [] []
+                , Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
                 , div [] [
                     Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ] [
                         Html.textarea [ Html.Events.onInput UpdateTextAreaValue ] []

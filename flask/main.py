@@ -44,20 +44,24 @@ def getBoard():
                     ,"..........."
                     ,".....a....."
                     ,"...aaaaa..."]
+                ,
+                "whoMoves": 1
             },
             {
                 "board":
                     ["...aaaaa..."
                     ,".....a....."
                     ,"..........."
-                    ,"a....d....a"
-                    ,"..a.ddd...a"
+                    ,"..a..d....a"
+                    ,"a...ddd...a"
                     ,"aa.ddkdd.aa"
                     ,"a...ddd...a"
                     ,"a....d....a"
                     ,"..........."
                     ,".....a....."
                     ,"...aaaaa..."]
+                ,
+                "whoMoves": 2
             }
         ]
     })
@@ -69,10 +73,31 @@ def getMoves():
     {
         "positions": [{
             "row": 1,
-            "column": 1
+            "column": 7
         }, {
-            "row": 1,
-            "column": 2
+            "row": 2,
+            "column": 7
+        }, {
+            "row": 3,
+            "column": 7
+        }, {
+            "row": 4,
+            "column": 7
+        }, {
+            "row": 6,
+            "column": 7
+        }, {
+            "row": 7,
+            "column": 7
+        }, {
+            "row": 8,
+            "column": 7
+        }, {
+            "row": 9,
+            "column": 7
+        }, {
+            "row": 5,
+            "column": 8
         }]
     })
 
@@ -83,16 +108,18 @@ def makeMove():
     {
         "board":    
             ["...aaaaa..."
-            ,"..a........"
-            ,"..........."
-            ,"a....d....a"
+            ,".....a....."
+            ,".......d..."
+            ,"..a..d....a"
             ,"a...ddd...a"
-            ,"aa.ddkdd.aa"
+            ,"aa.ddkd..aa"
             ,"a...ddd...a"
             ,"a....d....a"
             ,"..........."
             ,".....a....."
             ,"...aaaaa..."]
+        ,
+        "whoMoves": 1
     })
 
 @app.route('/getHint', methods=['GET','POST'])
@@ -103,11 +130,11 @@ def getHint():
         "hint": {
             "from": {
                 "row": 5,
-                "column": 5
+                "column": 7
             },
             "to": {
                 "row": 2,
-                "column": 5
+                "column": 7
             }
         }
     })
