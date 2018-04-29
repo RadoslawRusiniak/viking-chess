@@ -1,21 +1,26 @@
+module Main exposing (main, Model)
+
 import Html exposing (Html, Attribute, button, div, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
-import Matrix exposing (Matrix, square, toList, Location, row, col)
+
 import Maybe exposing (withDefault)
 
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Http
 
+import Matrix as Mtrx exposing (Matrix, square, toList, Location, row, col)
+import Navigation as Nav exposing (program, Location)
+
 main : Program Never Model Msg
-main =
-  Html.program
-    { init = init
-    , view = view
-    , update = update
-    , subscriptions = subscriptions
-    }
+main = Nav.program
+        (\_ -> Dummy) --TODO how to ignore
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = subscriptions
+        }
 
 
 -- MODEL
@@ -28,27 +33,32 @@ type alias WhoMoves = Int
 type alias GameState = (Board, WhoMoves)
 type alias Model =
     { state : GameState
-    , clickedLocation : Maybe Location
-    , possibleMoves : Maybe (List Location)
+    , clickedLocation : Maybe Mtrx.Location
+    , possibleMoves : Maybe (List Mtrx.Location)
     , historyPrev : List GameState
     , historyNext : List GameState
     , textareavalue : String
     , errorText : String
     , currentScore : Float
+    , token : String
     }
 
-init : (Model, Cmd Msg)
-init =
-    (Model
-        (square 11 (\_ -> Empty), 1)
-        Nothing
-        Nothing
-        []
-        []
-        ""
-        ""
-        0
-    , getHistory)
+init : Nav.Location -> (Model, Cmd Msg)
+init location =
+    let
+        parsedToken = location.search |> String.split "=" |> List.reverse |> List.head |> withDefault ""
+    in
+        (Model
+            (square 11 (\_ -> Empty), 1)
+            Nothing
+            Nothing
+            []
+            []
+            ""
+            ""
+            0
+            parsedToken
+        , getHistory parsedToken)
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
@@ -56,17 +66,18 @@ subscriptions _ = Sub.none
 -- UPDATE
 
 type alias HttpRes a = Result Http.Error a
-type alias Move = (Location, Location)
+type alias Move = (Mtrx.Location, Mtrx.Location)
 
 type Msg =
-      Clicked Location
+    Dummy
+    | Clicked Mtrx.Location
     | LoadHistoryViaHttp
     | LoadHistoryResponse (HttpRes (List GameState))
     | UpdateTextAreaValue String
     | LoadHistoryFromTextArea
     | Next | Prev
     | GetScore | GetScoreResponse (HttpRes Float)
-    | GetMovesResponse (HttpRes (List Location))
+    | GetMovesResponse (HttpRes (List Mtrx.Location))
     | MakeMoveResponse (HttpRes GameState)
     | GetHint | GetHintResponse (HttpRes Move)
 
@@ -77,7 +88,7 @@ update msg model =
 
         getHead lst =
             let
-                emptyState = (Matrix.square 0 (\_ -> Empty), 0)
+                emptyState = (Mtrx.square 0 (\_ -> Empty), 0)
             in
                 List.head lst |> withDefault emptyState
 
@@ -95,7 +106,7 @@ update msg model =
         zipPrev m = {m | historyPrev = getTail m.historyPrev, state = getHead m.historyPrev,
                          historyNext = m.state :: m.historyNext}
 
-        handleClick : Model -> Location -> (Model, Cmd Msg)
+        handleClick : Model -> Mtrx.Location -> (Model, Cmd Msg)
         handleClick model location =
             case model.clickedLocation of
                 Nothing -> ( { model | clickedLocation = Just location },
@@ -106,8 +117,9 @@ update msg model =
                         False -> ( { model | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none)
     in
         case msg of
+            Dummy -> (model, Cmd.none)
             Clicked location -> handleClick model location
-            LoadHistoryViaHttp -> (model, getHistory)
+            LoadHistoryViaHttp -> (model, getHistory model.token)
             LoadHistoryResponse (Err e) -> handleErr e
             LoadHistoryResponse (Ok h) -> insertHistoryIntoModel h
             UpdateTextAreaValue v -> ( { model | textareavalue = v }, Cmd.none)
@@ -146,15 +158,15 @@ getHint state =
     in
         Http.send GetHintResponse request
 
-getHistory : Cmd Msg
-getHistory =
+getHistory : String -> Cmd Msg
+getHistory token =
     let
-        url = server ++ "getHistory"
+        url = server ++ "getHistory?token=" ++ token
         request = Http.get url gameStateListDecoder
     in
         Http.send LoadHistoryResponse request
 
-makeMove : GameState -> Location -> Cmd Msg
+makeMove : GameState -> Mtrx.Location -> Cmd Msg
 makeMove state location =
     let
         jsonState = stateToJsonValue state |> Encode.encode 0
@@ -165,14 +177,14 @@ makeMove state location =
     in
         Http.send MakeMoveResponse request
 
-getReachablePositions : GameState -> Location -> Cmd Msg
+getReachablePositions : GameState -> Mtrx.Location -> Cmd Msg
 getReachablePositions state location =
     let
         jsonState = stateToJsonValue state |> Encode.encode 0
         jsonLocation = location |> locationToJsonValue |> Encode.encode 0
         url = server ++ "getReachablePositions?state=" ++ jsonState ++ "&location=" ++ jsonLocation
 
-        listOfMovesDecoder : Decode.Decoder (List Location)
+        listOfMovesDecoder : Decode.Decoder (List Mtrx.Location)
         listOfMovesDecoder = Decode.field "positions" (Decode.list locationDecoder)
         request = Http.get url listOfMovesDecoder
     in
@@ -192,8 +204,8 @@ getCurrentScore state =
 loadHistoryFromTextArea : String -> List GameState
 loadHistoryFromTextArea s = s |> Decode.decodeString gameStateListDecoder |> Result.toMaybe |> withDefault []
 
-locationDecoder : Decode.Decoder Location
-locationDecoder = Decode.map2 Matrix.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
+locationDecoder : Decode.Decoder Mtrx.Location
+locationDecoder = Decode.map2 Mtrx.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
 
 gameStateDecoder : Decode.Decoder GameState
 gameStateDecoder =
@@ -211,7 +223,7 @@ gameStateDecoder =
         decode2DList : Decode.Decoder (List (List Field))
         decode2DList = Decode.list decodeFieldsRow
         decodeBoard : Decode.Decoder Board
-        decodeBoard = decode2DList |> Decode.andThen (\l -> l |> Matrix.fromList |> Decode.succeed)
+        decodeBoard = decode2DList |> Decode.andThen (\l -> l |> Mtrx.fromList |> Decode.succeed)
         decodeFieldBoard = Decode.field "board" decodeBoard
         decodeFieldWhoMoves = Decode.field "whoMoves" Decode.int
     in
@@ -220,13 +232,13 @@ gameStateDecoder =
 gameStateListDecoder : Decode.Decoder (List GameState)
 gameStateListDecoder = Decode.field "history" (Decode.list gameStateDecoder)
 
-locationToJsonValue : Location -> Encode.Value
+locationToJsonValue : Mtrx.Location -> Encode.Value
 locationToJsonValue location = 
     let
         asObject loc = 
             let
-                x = Matrix.row loc |> Encode.int
-                y = Matrix.col loc |> Encode.int
+                x = Mtrx.row loc |> Encode.int
+                y = Mtrx.col loc |> Encode.int
             in
                 Encode.object [("row", x), ("column", y)]
         asLocationObject loc = Encode.object [("location", loc)]
@@ -242,7 +254,7 @@ stateToJsonValue (b, who) =
             Attacker    -> 'a'
             King        -> 'k'
         toRows : Board -> List String
-        toRows b = b |> Matrix.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
+        toRows b = b |> Mtrx.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
         boardToJsonValue b = b |> toRows |> List.map Encode.string |> Encode.list
         whoToJsonValue = Encode.int
     in
@@ -265,8 +277,8 @@ view model =
         div [ style [("display", "flex"), ("flex-direction", "row")] ] [
             div [] (
                 model.state |> Tuple.first
-                    |> Matrix.mapWithLocation (\loc elem -> div [ myStyle (fieldColors elem loc), onClick (Clicked loc) ] [])
-                    |> Matrix.toList
+                    |> Mtrx.mapWithLocation (\loc elem -> div [ myStyle (fieldColors elem loc), onClick (Clicked loc) ] [])
+                    |> Mtrx.toList
                     |> List.map (div [ style [("height", "56px")]])
             )
             , div [] [

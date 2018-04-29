@@ -15,7 +15,7 @@ cors = CORS(app, resources={
 })
 
 
-@app.route('/getScore', methods=['GET','POST'])
+@app.route('/getScore', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getScore():
     return jsonify(
@@ -24,7 +24,7 @@ def getScore():
     })
 
 
-@app.route('/getHistory', methods=['GET','POST'])
+@app.route('/getHistory', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getBoard():
     return jsonify(
@@ -66,7 +66,7 @@ def getBoard():
         ]
     })
 
-@app.route('/getReachablePositions', methods=['GET','POST'])
+@app.route('/getReachablePositions', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getMoves():
     return jsonify(
@@ -101,7 +101,7 @@ def getMoves():
         }]
     })
 
-@app.route('/makeMove', methods=['GET','POST'])
+@app.route('/makeMove', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def makeMove():
     return jsonify(
@@ -122,7 +122,7 @@ def makeMove():
         "whoMoves": 1
     })
 
-@app.route('/getHint', methods=['GET','POST'])
+@app.route('/getHint', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getHint():
     return jsonify(
