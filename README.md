@@ -1,5 +1,5 @@
 # viking-chess
-What's that?
+What is that?
 
 Simple web ui for viking chess, along with flask app for mocking logic.
 
@@ -24,7 +24,7 @@ Prerequisites:
 
   elm package install
 
-
+Note: it is very important to be in elm subdirectory everytime you perform operations related to elm. If you are in the root of a project some of them may even work, not all tho :( So you may end up spending a lot of time wondering what is wrong, just like me...
 
 Running:
 

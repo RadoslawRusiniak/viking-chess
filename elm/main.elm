@@ -12,6 +12,7 @@ import Http
 
 import Matrix as Mtrx exposing (Matrix, square, toList, Location, row, col)
 import Navigation as Nav exposing (program, Location)
+import UrlParser exposing (Parser, top, s, (<?>), stringParam, parsePath)
 
 main : Program Never Model Msg
 main = Nav.program
@@ -46,7 +47,9 @@ type alias Model =
 init : Nav.Location -> (Model, Cmd Msg)
 init location =
     let
-        parsedToken = location.search |> String.split "=" |> List.reverse |> List.head |> withDefault ""
+        parser : Parser (Maybe String -> a) a
+        parser = s "main.elm" <?> stringParam "token" --TODO how to get rid of "main.elm"
+        parsedToken = parsePath parser location |> withDefault Nothing |> withDefault "wrong"
     in
         (Model
             (square 11 (\_ -> Empty), 1)
