@@ -160,14 +160,23 @@ getHint state =
         request = Http.get url hintDecoder
     in
         Http.send GetHintResponse request
+        
 
 getHistory : String -> Cmd Msg
 getHistory token =
     let
-        url = server ++ "getHistory?token=" ++ token
-        request = Http.get url gameStateListDecoder
+        request = Http.request
+            { method = "GET"
+            , headers = [Http.header "authenticationToken" token]
+            , url = server ++ "getHistory"
+            , body = Http.emptyBody
+            , expect = Http.expectJson gameStateListDecoder
+            , timeout = Nothing
+            , withCredentials = False
+        }
     in
         Http.send LoadHistoryResponse request
+
 
 makeMove : GameState -> Mtrx.Location -> Cmd Msg
 makeMove state location =

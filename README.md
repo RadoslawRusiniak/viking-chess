@@ -14,15 +14,17 @@ Prerequisites:
 2. Python lang. https://www.python.org/downloads/
 3. Flask. After Python is installed run:
 
-  pip install flask
+    pip install flask
 
-4. Flask-cors. After flask is installed run:
+4. Flask-cors and passlib. After flask is installed run:
 
-  pip install flask-cors
+    pip install flask-cors
+
+    pip install passlib
 
 5. Elm packages. Navigate to project, then to elm subdirectory and run:
 
-  elm package install
+    elm package install
 
 Note: it is very important to be in elm subdirectory everytime you perform operations related to elm. If you are in the root of a project some of them may even work, not all tho :( So you may end up spending a lot of time wondering what is wrong, just like me...
 

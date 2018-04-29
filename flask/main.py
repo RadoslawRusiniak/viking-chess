@@ -1,6 +1,9 @@
 from flask import Flask
 from flask import jsonify
+from flask import request
 from flask_cors import CORS, cross_origin
+
+from passlib.hash import sha256_crypt
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'the quick brown fox jumps over the lazy dog'
@@ -27,6 +30,11 @@ def getScore():
 @app.route('/getHistory', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getBoard():
+    token = request.headers.get('authenticationToken')
+    hashed = "$5$rounds=535000$ENo3iRhqu7vUmSbj$kVaJXswpB9sHDHx3rbGgUnqYjo9pFrptW6mGgqNlSa3"
+    if (not sha256_crypt.verify(token, hashed)):
+        return None #TODO some error here
+
     return jsonify(
     {
         "history":
