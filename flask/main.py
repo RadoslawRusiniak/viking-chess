@@ -17,10 +17,17 @@ cors = CORS(app, resources={
     , r"/getHint": {"origins": "http://localhost:5000"}
 })
 
+hashed = "$5$rounds=535000$ENk3T25VRNpieMOa$nEnASPxPNmdar6.a9ETs6rSaNbRRTtPSpbqpnIMpqRA"
+def isCorrectToken(hdrs):
+    token = hdrs['authenticationToken']
+    return sha256_crypt.verify(token, hashed)
 
 @app.route('/getScore', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getScore():
+    if (not isCorrectToken(request.headers)):
+        return None #TODO some error here
+
     return jsonify(
     {
         "score": 3
@@ -30,9 +37,7 @@ def getScore():
 @app.route('/getHistory', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getBoard():
-    token = request.headers.get('authenticationToken')
-    hashed = "$5$rounds=535000$ENo3iRhqu7vUmSbj$kVaJXswpB9sHDHx3rbGgUnqYjo9pFrptW6mGgqNlSa3"
-    if (not sha256_crypt.verify(token, hashed)):
+    if (not isCorrectToken(request.headers)):
         return None #TODO some error here
 
     return jsonify(
@@ -76,7 +81,10 @@ def getBoard():
 
 @app.route('/getReachablePositions', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
-def getMoves():
+def getReachablePositions():
+    if (not isCorrectToken(request.headers)):
+        return None #TODO some error here
+
     return jsonify(
     {
         "positions": [{
@@ -112,6 +120,9 @@ def getMoves():
 @app.route('/makeMove', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def makeMove():
+    if (not isCorrectToken(request.headers)):
+        return None #TODO some error here
+
     return jsonify(
     {
         "board":    
@@ -133,6 +144,9 @@ def makeMove():
 @app.route('/getHint', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getHint():
+    if (not isCorrectToken(request.headers)):
+        return None #TODO some error here
+
     return jsonify(
     {
         "hint": {
