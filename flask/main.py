@@ -5,17 +5,48 @@ from flask_cors import CORS, cross_origin
 
 from passlib.hash import sha256_crypt
 
+from betafl import FetlarEngine
+
+e = FetlarEngine()
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'the quick brown fox jumps over the lazy dog'
 app.config['CORS_HEADERS'] = 'Content-Type'
 
 cors = CORS(app, resources={
-    r"/getScore": {"origins": "http://localhost:5000"}
+    r"/initGame": {"origins": "http://localhost:5000"}
+    , r"/getScore": {"origins": "http://localhost:5000"}
     , r"/getHistory": {"origins": "http://localhost:5000"}
     , r"/getReachablePositions": {"origins": "http://localhost:5000"}
     , r"/makeMove": {"origins": "http://localhost:5000"}
     , r"/getHint": {"origins": "http://localhost:5000"}
 })
+
+hashed = "$5$rounds=535000$CEoVj1v120WFeYfX$027jiw66sPzekyGfxq.ptuCOs6LyR8h4UjI9IJf3EV2"
+def isCorrectRequest(hdrs):
+    token = hdrs.get('authenticationToken')
+    return sha256_crypt.verify(token, hashed)
+
+
+@app.route('/initGame', methods=['GET'])
+@cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
+def initGame():
+
+    if (not isCorrectRequest(request.headers)):
+        return None #TODO some error here
+
+    e.new_game()
+
+    return jsonify(
+    {
+        "history":
+        [
+            {
+                "board": e.board.to_string()
+                , "whoMoves": e.current_side
+            }
+        ]
+    })
 
 
 @app.route('/getScore', methods=['GET'])

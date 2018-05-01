@@ -14,6 +14,8 @@ import Matrix as Mtrx exposing (Matrix, square, toList, Location, row, col)
 import Navigation as Nav exposing (program, Location)
 import UrlParser exposing (Parser, top, s, (<?>), stringParam, parsePath)
 
+import List.Split exposing (chunksOfLeft)
+
 main : Program Never Model Msg
 main = Nav.program
         (\_ -> Dummy) --TODO how to ignore
@@ -52,7 +54,7 @@ init location =
         parsedToken = parsePath parser location |> withDefault Nothing |> withDefault "wrong"
     in
         (Model
-            (square 11 (\_ -> Empty), 1)
+            (square 0 (\_ -> Empty), 1)
             Nothing
             Nothing
             []
@@ -61,7 +63,7 @@ init location =
             ""
             0
             parsedToken
-        , getHistory parsedToken)
+        , initGame parsedToken)
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
@@ -73,6 +75,7 @@ type alias Move = (Mtrx.Location, Mtrx.Location)
 
 type Msg =
     Dummy
+    | InitGameResponse (HttpRes (List GameState))
     | Clicked Mtrx.Location
     | LoadHistoryViaHttp
     | LoadHistoryResponse (HttpRes (List GameState))
@@ -121,6 +124,8 @@ update msg model =
     in
         case msg of
             Dummy -> (model, Cmd.none)
+            InitGameResponse (Err e) -> handleErr e
+            InitGameResponse (Ok h) -> insertHistoryIntoModel h
             Clicked location -> handleClick model location
             LoadHistoryViaHttp -> (model, getHistory model.token)
             LoadHistoryResponse (Err e) -> handleErr e
@@ -146,6 +151,22 @@ update msg model =
 
 server : String
 server = "http://localhost:5000/"
+
+initGame : String -> Cmd Msg
+initGame token =
+    let
+        request = Http.request
+            { method = "GET"
+            , headers = [Http.header "authenticationToken" token]
+            , url = server ++ "initGame"
+            , body = Http.emptyBody
+            , expect = Http.expectJson gameStateListDecoder
+            , timeout = Nothing
+            , withCredentials = False
+        }
+    in
+        Http.send InitGameResponse request
+
 
 getHint : GameState -> Cmd Msg
 getHint state = 
@@ -228,14 +249,15 @@ gameStateDecoder =
             'd' -> Defender
             'k' -> King
             _ -> Empty
-        stringToFields : String -> List Field
-        stringToFields s = s |> String.toList |> List.map charToField
-        decodeFieldsRow : Decode.Decoder (List Field)
-        decodeFieldsRow = Decode.string |> Decode.andThen (\x -> x |> stringToFields |> Decode.succeed)
-        decode2DList : Decode.Decoder (List (List Field))
-        decode2DList = Decode.list decodeFieldsRow
+        boardLen = 11 --TODO pass board size and read it here
+        stringToFields : List Char -> List Field
+        stringToFields = List.map charToField
+        strings : String -> List (List Char)
+        strings s = String.toList s |> chunksOfLeft boardLen
+        decodeFields : Decode.Decoder (List (List Field))
+        decodeFields = Decode.string |> Decode.andThen (\x -> x |> strings |> List.map stringToFields |> Decode.succeed)
         decodeBoard : Decode.Decoder Board
-        decodeBoard = decode2DList |> Decode.andThen (\l -> l |> Mtrx.fromList |> Decode.succeed)
+        decodeBoard = decodeFields |> Decode.andThen (\l -> l |> Mtrx.fromList |> Decode.succeed)
         decodeFieldBoard = Decode.field "board" decodeBoard
         decodeFieldWhoMoves = Decode.field "whoMoves" Decode.int
     in

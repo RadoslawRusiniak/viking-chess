@@ -3,3 +3,5 @@ elm-stuff/
 *.swp
 *.swo
 *.pyc
+betafl/
+*requirements.txt
