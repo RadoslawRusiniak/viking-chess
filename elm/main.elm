@@ -116,10 +116,10 @@ update msg model =
         handleClick model location =
             case model.clickedLocation of
                 Nothing -> ( { model | clickedLocation = Just location },
-                            getReachablePositions model.state location)
+                            getReachablePositions model.token model.state location)
                 Just moves -> 
                     case List.member location (model.possibleMoves |> withDefault []) of
-                        True -> ( { model | clickedLocation = Nothing }, makeMove model.state location)
+                        True -> ( { model | clickedLocation = Nothing }, makeMove model.token model.state location)
                         False -> ( { model | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none)
     in
         case msg of
@@ -134,7 +134,7 @@ update msg model =
             LoadHistoryFromTextArea -> loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel
             Next -> (zipNext model, Cmd.none)
             Prev -> (zipPrev model, Cmd.none)
-            GetScore -> (model, getCurrentScore model.state)
+            GetScore -> (model, getCurrentScore model.token model.state)
             GetScoreResponse (Err e) -> handleErr e
             GetScoreResponse (Ok x) -> ( { model | currentScore = x }, Cmd.none)
             GetMovesResponse (Err e) -> handleErr e
@@ -144,7 +144,7 @@ update msg model =
             MakeMoveResponse (Ok s) -> ( { model | errorText = "", state = s, possibleMoves = Nothing, 
                                          historyPrev = model.state :: model.historyPrev,
                                          historyNext = [] }, Cmd.none)
-            GetHint -> (model, getHint model.state)
+            GetHint -> (model, getHint model.token model.state)
             GetHintResponse (Err e) -> handleErr e
             GetHintResponse (Ok (from, to)) -> ( { model | clickedLocation = Just from, possibleMoves = Just [to] },
                                                 Cmd.none)
@@ -167,9 +167,8 @@ initGame token =
     in
         Http.send InitGameResponse request
 
-
-getHint : GameState -> Cmd Msg
-getHint state = 
+getHint : String -> GameState -> Cmd Msg
+getHint token state = 
     let
         jsonState = stateToJsonValue state |> Encode.encode 0
 
@@ -177,8 +176,15 @@ getHint state =
         moveDecoder = Decode.map2 ((,)) (Decode.field "from" locationDecoder) (Decode.field "to" locationDecoder)
         hintDecoder = Decode.field "hint" moveDecoder
 
-        url = server ++ "getHint" ++ "?state=" ++ jsonState
-        request = Http.get url hintDecoder
+        request = Http.request
+            { method = "GET"
+            , headers = [Http.header "authenticationToken" token]
+            , url = server ++ "getHint" ++ "?state=" ++ jsonState
+            , body = Http.emptyBody
+            , expect = Http.expectJson hintDecoder
+            , timeout = Nothing
+            , withCredentials = False
+        }
     in
         Http.send GetHintResponse request
         
@@ -199,38 +205,61 @@ getHistory token =
         Http.send LoadHistoryResponse request
 
 
-makeMove : GameState -> Mtrx.Location -> Cmd Msg
-makeMove state location =
+makeMove : String -> GameState -> Mtrx.Location -> Cmd Msg
+makeMove token state location =
     let
         jsonState = stateToJsonValue state |> Encode.encode 0
         jsonLocation = location |> locationToJsonValue |> Encode.encode 0
-        uri = server ++ "makeMove?state=" ++ jsonState ++ "&location=" ++ jsonLocation
 
-        request = Http.get uri gameStateDecoder
+        request = Http.request
+            { method = "GET"
+            , headers = [Http.header "authenticationToken" token]
+            , url = server ++ "makeMove?state=" ++ jsonState ++ "&location=" ++ jsonLocation
+            , body = Http.emptyBody
+            , expect = Http.expectJson gameStateDecoder
+            , timeout = Nothing
+            , withCredentials = False
+        }
     in
         Http.send MakeMoveResponse request
 
-getReachablePositions : GameState -> Mtrx.Location -> Cmd Msg
-getReachablePositions state location =
+getReachablePositions : String -> GameState -> Mtrx.Location -> Cmd Msg
+getReachablePositions token state location =
     let
         jsonState = stateToJsonValue state |> Encode.encode 0
         jsonLocation = location |> locationToJsonValue |> Encode.encode 0
-        url = server ++ "getReachablePositions?state=" ++ jsonState ++ "&location=" ++ jsonLocation
 
         listOfMovesDecoder : Decode.Decoder (List Mtrx.Location)
         listOfMovesDecoder = Decode.field "positions" (Decode.list locationDecoder)
-        request = Http.get url listOfMovesDecoder
+
+        request = Http.request
+            { method = "GET"
+            , headers = [Http.header "authenticationToken" token]
+            , url = server ++ "getReachablePositions?state=" ++ jsonState ++ "&location=" ++ jsonLocation
+            , body = Http.emptyBody
+            , expect = Http.expectJson listOfMovesDecoder
+            , timeout = Nothing
+            , withCredentials = False
+        }
     in
         Http.send GetMovesResponse request
 
-getCurrentScore : GameState -> Cmd Msg
-getCurrentScore state =
+getCurrentScore : String -> GameState -> Cmd Msg
+getCurrentScore token state =
     let
         jsonVal = stateToJsonValue state
-        url = server ++ "getScore?state=" ++ (Encode.encode 0 jsonVal)
         getScoreDecoder : Decode.Decoder Float
         getScoreDecoder = Decode.field "score" Decode.float
-        request = Http.get url getScoreDecoder
+        
+        request = Http.request
+            { method = "GET"
+            , headers = [Http.header "authenticationToken" token]
+            , url = server ++ "getScore?state=" ++ (Encode.encode 0 jsonVal)
+            , body = Http.emptyBody
+            , expect = Http.expectJson getScoreDecoder
+            , timeout = Nothing
+            , withCredentials = False
+        }
     in
         Http.send GetScoreResponse request
 
