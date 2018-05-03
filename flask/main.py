@@ -3,9 +3,12 @@ from flask import jsonify
 from flask import request
 from flask_cors import CORS, cross_origin
 
+import json
+
 from passlib.hash import sha256_crypt
 
 from betafl import FetlarEngine
+from betafl.elements.move import Coordinates
 
 e = FetlarEngine()
 
@@ -112,36 +115,23 @@ def getReachablePositions():
     if (not isCorrectRequest(request.headers)):
         return None #TODO some error here
 
+    parsed = json.loads(request.args["location"])
+    row, col = parsed["location"]["row"], parsed["location"]["column"]
+    gameLoc = Coordinates(row, col)
+
+    positions = e.board.get_reachable_from_position(gameLoc)
+
+    jsonPositions = []
+    for position in positions:
+        jsonPos = {
+            "row": position.row
+            , "column": position.column
+        }
+        jsonPositions.append(jsonPos)
+
     return jsonify(
     {
-        "positions": [{
-            "row": 1,
-            "column": 7
-        }, {
-            "row": 2,
-            "column": 7
-        }, {
-            "row": 3,
-            "column": 7
-        }, {
-            "row": 4,
-            "column": 7
-        }, {
-            "row": 6,
-            "column": 7
-        }, {
-            "row": 7,
-            "column": 7
-        }, {
-            "row": 8,
-            "column": 7
-        }, {
-            "row": 9,
-            "column": 7
-        }, {
-            "row": 5,
-            "column": 8
-        }]
+        "positions": jsonPositions
     })
 
 @app.route('/makeMove', methods=['GET'])
