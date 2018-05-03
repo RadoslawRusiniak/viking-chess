@@ -49,8 +49,8 @@ def initGame():
         "history":
         [
             {
-                "board": e.board.to_string()
-                , "whoMoves": e.current_side
+                "board": e.board.to_string(),
+                "whoMoves": e.current_side
             }
         ]
     })
@@ -79,36 +79,12 @@ def getBoard():
         "history":
         [
             {
-                "board":
-                    ["...aaaaa..."
-                    ,".....a....."
-                    ,"..........."
-                    ,"a....d....a"
-                    ,"a...ddd...a"
-                    ,"aa.ddkdd.aa"
-                    ,"a...ddd...a"
-                    ,"a....d....a"
-                    ,"..........."
-                    ,".....a....."
-                    ,"...aaaaa..."]
-                ,
-                "whoMoves": 1
+                "board": "...aaaaa........a................a....d....aa...ddd...aaa.ddkdd.aaa...ddd...aa....d....a................a........aaaaa...",
+                "whoMoves": 0
             },
             {
-                "board":
-                    ["...aaaaa..."
-                    ,".....a....."
-                    ,"..........."
-                    ,"..a..d....a"
-                    ,"a...ddd...a"
-                    ,"aa.ddkdd.aa"
-                    ,"a...ddd...a"
-                    ,"a....d....a"
-                    ,"..........."
-                    ,".....a....."
-                    ,"...aaaaa..."]
-                ,
-                "whoMoves": 2
+                "board": "...aaaaa........a..................a..d....aa...ddd...aaa.ddkdd.aaa...ddd...aa....d....a................a........aaaaa...",
+                "whoMoves": 1
             }
         ]
     })
@@ -126,8 +102,8 @@ def getReachablePositions():
     jsonPositions = []
     for position in positions:
         jsonPos = {
-            "row": position.row
-            , "column": position.column
+            "row": position.row,
+            "column": position.column
         }
         jsonPositions.append(jsonPos)
 
@@ -149,8 +125,8 @@ def makeMove():
     
     return jsonify(
     {
-        "board": e.board.to_string()
-        , "whoMoves": e.current_side
+        "board": e.board.to_string(),
+        "whoMoves": e.current_side
     })
 
 @app.route('/getHint', methods=['GET'])
