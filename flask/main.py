@@ -30,8 +30,6 @@ def isCorrectRequest(hdrs):
     token = hdrs.get('authenticationToken')
     return sha256_crypt.verify(token, hashed)
 
-curMove = Move(Coordinates(-1, -1), Coordinates(-1, -1)) #TODO do not keep it as global var, pass cordFrom in makeMove
-
 def parseCoordinates(data):
     parsed = json.loads(data)
     row, col = parsed["location"]["row"], parsed["location"]["column"]
@@ -123,8 +121,6 @@ def getReachablePositions():
 
     gameLoc = parseCoordinates(request.args["location"])
 
-    curMove.coord_from = gameLoc #TODO delete this once there is coord_from in makeMove request
-
     positions = e.board.get_reachable_from_position(gameLoc)
 
     jsonPositions = []
@@ -146,11 +142,10 @@ def makeMove():
     if (not isCorrectRequest(request.headers)):
         return None #TODO some error here
 
-    gameLoc = parseCoordinates(request.args["location"])
+    locFrom = parseCoordinates(request.args["from"])
+    locTo = parseCoordinates(request.args["to"])
 
-    curMove.coord_to = gameLoc
-
-    e.board.make_move(curMove)
+    e.board.make_move(Move(locFrom, locTo))
     e.change_side()
 
     return jsonify(

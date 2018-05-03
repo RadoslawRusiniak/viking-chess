@@ -117,9 +117,9 @@ update msg model =
             case model.clickedLocation of
                 Nothing -> ( { model | clickedLocation = Just location },
                             getReachablePositions model.token model.state location)
-                Just moves -> 
+                Just from -> 
                     case List.member location (model.possibleMoves |> withDefault []) of
-                        True -> ( { model | clickedLocation = Nothing }, makeMove model.token model.state location)
+                        True -> ( { model | clickedLocation = Nothing }, makeMove model.token model.state from location)
                         False -> ( { model | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none)
     in
         case msg of
@@ -205,16 +205,17 @@ getHistory token =
         Http.send LoadHistoryResponse request
 
 
-makeMove : String -> GameState -> Mtrx.Location -> Cmd Msg
-makeMove token state location =
+makeMove : String -> GameState -> Mtrx.Location -> Mtrx.Location -> Cmd Msg
+makeMove token state locFrom locTo =
     let
         jsonState = stateToJsonValue state |> Encode.encode 0
-        jsonLocation = location |> locationToJsonValue |> Encode.encode 0
+        jsonLocation loc = loc |> locationToJsonValue |> Encode.encode 0
 
         request = Http.request
             { method = "GET"
             , headers = [Http.header "authenticationToken" token]
-            , url = server ++ "makeMove?state=" ++ jsonState ++ "&location=" ++ jsonLocation
+            , url = server ++ "makeMove?state=" ++ jsonState 
+                    ++ "&from=" ++ jsonLocation locFrom ++ "&to=" ++ jsonLocation locTo
             , body = Http.emptyBody
             , expect = Http.expectJson gameStateDecoder
             , timeout = Nothing
