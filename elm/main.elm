@@ -50,8 +50,8 @@ init : Nav.Location -> (Model, Cmd Msg)
 init location =
     let
         parser : Parser (Maybe String -> a) a
-        parser = s "main.elm" <?> stringParam "token" --TODO how to get rid of "main.elm"
-        parsedToken = parsePath parser location |> withDefault Nothing |> withDefault "wrong"
+        parser = s "main.elm" <?> stringParam "password" --TODO how to get rid of "main.elm"
+        parsedPassword = parsePath parser location |> withDefault Nothing |> withDefault "wrong"
     in
         (Model
             (square 0 (\_ -> Empty), 1)
@@ -62,8 +62,8 @@ init location =
             ""
             ""
             0
-            parsedToken
-        , initGame parsedToken)
+            ""
+        , initGame parsedPassword)
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
@@ -75,7 +75,7 @@ type alias Move = (Mtrx.Location, Mtrx.Location)
 
 type Msg =
     Dummy
-    | InitGameResponse (HttpRes (List GameState))
+    | InitGameResponse (HttpRes (String, List GameState))
     | Clicked Mtrx.Location
     | LoadHistoryViaHttp
     | LoadHistoryResponse (HttpRes (List GameState))
@@ -104,8 +104,10 @@ update msg model =
             let
                 rdata = List.reverse data
             in
-                ( {model | historyPrev = getTail rdata, state = getHead rdata, historyNext = [],
-                 clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none)
+                {model | historyPrev = getTail rdata, state = getHead rdata, historyNext = [],
+                 clickedLocation = Nothing, possibleMoves = Nothing }
+
+        addToken t model = { model | token = t }
 
         zipNext m = {m | historyPrev = m.state :: m.historyPrev, state = getHead m.historyNext,
                          historyNext = getTail m.historyNext}
@@ -125,13 +127,13 @@ update msg model =
         case msg of
             Dummy -> (model, Cmd.none)
             InitGameResponse (Err e) -> handleErr e
-            InitGameResponse (Ok h) -> insertHistoryIntoModel h
+            InitGameResponse (Ok (t, h)) -> (insertHistoryIntoModel h |> addToken t, Cmd.none)
             Clicked location -> handleClick model location
             LoadHistoryViaHttp -> (model, getHistory model.token)
             LoadHistoryResponse (Err e) -> handleErr e
-            LoadHistoryResponse (Ok h) -> insertHistoryIntoModel h
+            LoadHistoryResponse (Ok h) -> (insertHistoryIntoModel h, Cmd.none)
             UpdateTextAreaValue v -> ( { model | textareavalue = v }, Cmd.none)
-            LoadHistoryFromTextArea -> loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel
+            LoadHistoryFromTextArea -> (loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel, Cmd.none)
             Next -> (zipNext model, Cmd.none)
             Prev -> (zipPrev model, Cmd.none)
             GetScore -> (model, getCurrentScore model.token model.state)
@@ -153,14 +155,14 @@ server : String
 server = "http://localhost:5000/"
 
 initGame : String -> Cmd Msg
-initGame token =
+initGame pswrd =
     let
         request = Http.request
             { method = "GET"
-            , headers = [Http.header "authenticationToken" token]
+            , headers = [Http.header "password" pswrd]
             , url = server ++ "initGame"
             , body = Http.emptyBody
-            , expect = Http.expectJson gameStateListDecoder
+            , expect = Http.expectJson initGameDecoder
             , timeout = Nothing
             , withCredentials = False
         }
@@ -295,6 +297,13 @@ gameStateDecoder =
 
 gameStateListDecoder : Decode.Decoder (List GameState)
 gameStateListDecoder = Decode.field "history" (Decode.list gameStateDecoder)
+
+initGameDecoder : Decode.Decoder (String, List GameState)
+initGameDecoder =
+    let
+        tokenDecoder = Decode.field "token" Decode.string
+    in
+        Decode.map2 (\a b -> (a,b)) tokenDecoder gameStateListDecoder
 
 locationToJsonValue : Mtrx.Location -> Encode.Value
 locationToJsonValue location = 

@@ -4,6 +4,7 @@ from flask import request
 from flask_cors import CORS, cross_origin
 
 import json
+import secrets
 
 from passlib.hash import sha256_crypt
 
@@ -25,10 +26,15 @@ cors = CORS(app, resources={
     , r"/getHint": {"origins": "http://localhost:5000"}
 })
 
-hashed = "$5$rounds=535000$CEoVj1v120WFeYfX$027jiw66sPzekyGfxq.ptuCOs6LyR8h4UjI9IJf3EV2"
+hashedPassword = "$5$rounds=535000$CEoVj1v120WFeYfX$027jiw66sPzekyGfxq.ptuCOs6LyR8h4UjI9IJf3EV2"
+def isCorrectPassword(hdrs):
+    password = hdrs.get('password')
+    return sha256_crypt.verify(password, hashedPassword)
+
+generatedToken = secrets.token_urlsafe()
 def isCorrectRequest(hdrs):
-    token = hdrs.get('authenticationToken')
-    return sha256_crypt.verify(token, hashed)
+    requestToken = hdrs.get('authenticationToken')
+    return requestToken == generatedToken
 
 def parseCoordinates(data):
     parsed = json.loads(data)
@@ -38,14 +44,14 @@ def parseCoordinates(data):
 @app.route('/initGame', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def initGame():
-
-    if (not isCorrectRequest(request.headers)):
+    if (not isCorrectPassword(request.headers)):
         return None #TODO some error here
 
     e.new_game()
 
     return jsonify(
     {
+        "token": generatedToken,
         "history":
         [
             {
