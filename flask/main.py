@@ -145,9 +145,8 @@ def makeMove():
     locFrom = parseCoordinates(request.args["from"])
     locTo = parseCoordinates(request.args["to"])
 
-    e.board.make_move(Move(locFrom, locTo))
-    e.change_side()
-
+    e.make_move(Move(locFrom, locTo).to_string())
+    
     return jsonify(
     {
         "board": e.board.to_string()
