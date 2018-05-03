@@ -8,7 +8,7 @@ import json
 from passlib.hash import sha256_crypt
 
 from betafl import FetlarEngine
-from betafl.elements.move import Coordinates
+from betafl.elements.move import Coordinates, Move
 
 e = FetlarEngine()
 
@@ -30,6 +30,12 @@ def isCorrectRequest(hdrs):
     token = hdrs.get('authenticationToken')
     return sha256_crypt.verify(token, hashed)
 
+curMove = Move(Coordinates(-1, -1), Coordinates(-1, -1)) #TODO do not keep it as global var, pass cordFrom in makeMove
+
+def parseCoordinates(data):
+    parsed = json.loads(data)
+    row, col = parsed["location"]["row"], parsed["location"]["column"]
+    return Coordinates(row, col)
 
 @app.route('/initGame', methods=['GET'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
@@ -115,9 +121,9 @@ def getReachablePositions():
     if (not isCorrectRequest(request.headers)):
         return None #TODO some error here
 
-    parsed = json.loads(request.args["location"])
-    row, col = parsed["location"]["row"], parsed["location"]["column"]
-    gameLoc = Coordinates(row, col)
+    gameLoc = parseCoordinates(request.args["location"])
+
+    curMove.coord_from = gameLoc #TODO delete this once there is coord_from in makeMove request
 
     positions = e.board.get_reachable_from_position(gameLoc)
 
@@ -140,22 +146,17 @@ def makeMove():
     if (not isCorrectRequest(request.headers)):
         return None #TODO some error here
 
+    gameLoc = parseCoordinates(request.args["location"])
+
+    curMove.coord_to = gameLoc
+
+    e.board.make_move(curMove)
+    e.change_side()
+
     return jsonify(
     {
-        "board":    
-            ["...aaaaa..."
-            ,".....a....."
-            ,".......d..."
-            ,"..a..d....a"
-            ,"a...ddd...a"
-            ,"aa.ddkd..aa"
-            ,"a...ddd...a"
-            ,"a....d....a"
-            ,"..........."
-            ,".....a....."
-            ,"...aaaaa..."]
-        ,
-        "whoMoves": 1
+        "board": e.board.to_string()
+        , "whoMoves": e.current_side
     })
 
 @app.route('/getHint', methods=['GET'])
