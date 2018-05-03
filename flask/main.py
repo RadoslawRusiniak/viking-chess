@@ -10,7 +10,7 @@ from passlib.hash import sha256_crypt
 from betafl import FetlarEngine
 from betafl.elements.move import Coordinates, Move
 
-e = FetlarEngine()
+e = FetlarEngine(2)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'the quick brown fox jumps over the lazy dog'
@@ -135,16 +135,18 @@ def getHint():
     if (not isCorrectRequest(request.headers)):
         return None #TODO some error here
 
+    hint = e.go()
+
     return jsonify(
     {
         "hint": {
             "from": {
-                "row": 5,
-                "column": 7
+                "row": hint.coord_from.row,
+                "column": hint.coord_from.column
             },
             "to": {
-                "row": 2,
-                "column": 7
+                "row": hint.coord_to.row,
+                "column": hint.coord_to.column
             }
         }
     })
