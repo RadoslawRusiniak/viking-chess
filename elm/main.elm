@@ -488,14 +488,21 @@ view model =
                 Just clicked ->
                     lc == clicked
 
-        fieldColors elem location =
-            pickColors elem (isHighlighted location) (isClicked location)
+        getFieldStyle loc =
+            fieldStyle (isHighlighted loc) (isClicked loc)
+
+        --TODO maybe nicer way of handling empty field
+        setPawn elem =
+            if elem == Empty then
+                div [] []
+            else
+                div [ pawnStyle elem ] []
     in
         div [ style [ ( "display", "flex" ), ( "flex-direction", "row" ) ] ]
             [ div []
                 (model.state
                     |> Tuple.first
-                    |> Mtrx.mapWithLocation (\loc elem -> div [ myStyle (fieldColors elem loc), onClick (Clicked loc) ] [])
+                    |> Mtrx.mapWithLocation (\loc elem -> div [ getFieldStyle loc, onClick (Clicked loc) ] [ setPawn elem ])
                     |> Mtrx.toList
                     |> List.map (div [ style [ ( "height", "56px" ) ] ])
                 )
@@ -520,29 +527,6 @@ type alias IsClicked =
     Bool
 
 
-pickColors : Field -> IsHighlighted -> IsClicked -> ( String, String )
-pickColors f h c =
-    ( case f of
-        Empty ->
-            "peru"
-
-        Defender ->
-            "white"
-
-        Attacker ->
-            "grey"
-
-        King ->
-            "purple"
-    , if h then
-        "orange"
-      else if c then
-        "red"
-      else
-        "black"
-    )
-
-
 errStyle : Attribute Msg
 errStyle =
     style
@@ -551,12 +535,50 @@ errStyle =
         ]
 
 
-myStyle : ( String, String ) -> Attribute Msg
-myStyle ( background, border ) =
-    style
-        [ ( "backgroundColor", background )
-        , ( "height", "50px" )
-        , ( "width", "50px" )
-        , ( "border", "3px solid " ++ border )
-        , ( "display", "inline-block" )
-        ]
+fieldStyle : IsHighlighted -> IsClicked -> Attribute Msg
+fieldStyle h c =
+    let
+        background =
+            if h then
+                "orange"
+            else if c then
+                "red"
+            else
+                "peru"
+    in
+        style
+            [ ( "backgroundColor", background )
+            , ( "height", "50px" )
+            , ( "width", "50px" )
+            , ( "border", "3px solid black" )
+            , ( "display", "inline-block" )
+            ]
+
+
+pawnStyle : Field -> Attribute Msg
+pawnStyle f =
+    let
+        background =
+            case f of
+                Empty ->
+                    "peru"
+
+                Defender ->
+                    "white"
+
+                Attacker ->
+                    "grey"
+
+                King ->
+                    "purple"
+    in
+        style
+            [ ( "backgroundColor", background )
+            , ( "height", "44px" )
+            , ( "width", "44px" )
+            , ( "margin-left", "3px" )
+            , ( "margin-top", "3px" )
+            , ( "display", "inline-block" )
+            , ( "position", "absolute" )
+            , ( "-webkit-border-radius", "44px" )
+            ]
