@@ -16,8 +16,8 @@ import List.Split exposing (chunksOfLeft)
 main : Program Never Model Msg
 main =
     Nav.program
-        (\_ -> Dummy)
         --TODO how to ignore
+        (\_ -> Dummy)
         { init = init
         , view = view
         , update = update
@@ -54,7 +54,6 @@ type alias Model =
     , possibleMoves : Maybe (List Mtrx.Location)
     , historyPrev : List GameState
     , historyNext : List GameState
-    , textareavalue : String
     , errorText : String
     , currentScore : Float
     , token : String
@@ -64,11 +63,11 @@ type alias Model =
 init : Nav.Location -> ( Model, Cmd Msg )
 init location =
     let
+        --TODO how to get rid of "main.elm"
         parser : Parser (Maybe String -> a) a
         parser =
             s "main.elm" <?> stringParam "password"
 
-        --TODO how to get rid of "main.elm"
         parsedPassword =
             parsePath parser location |> withDefault Nothing |> withDefault "wrong"
     in
@@ -78,7 +77,6 @@ init location =
             Nothing
             []
             []
-            ""
             ""
             0
             ""
@@ -105,12 +103,8 @@ type alias Move =
 
 type Msg
     = Dummy
-    | InitGameResponse (HttpRes ( String, List GameState ))
+    | InitGameResponse (HttpRes ( String, GameState ))
     | Clicked Mtrx.Location
-    | LoadHistoryViaHttp
-    | LoadHistoryResponse (HttpRes (List GameState))
-    | UpdateTextAreaValue String
-    | LoadHistoryFromTextArea
     | Next
     | Prev
     | GetScore
@@ -136,22 +130,6 @@ update msg model =
 
         getTail lst =
             List.tail lst |> withDefault []
-
-        insertHistoryIntoModel data =
-            let
-                rdata =
-                    List.reverse data
-            in
-                { model
-                    | historyPrev = getTail rdata
-                    , state = getHead rdata
-                    , historyNext = []
-                    , clickedLocation = Nothing
-                    , possibleMoves = Nothing
-                }
-
-        addToken t model =
-            { model | token = t }
 
         zipNext m =
             { m
@@ -190,26 +168,11 @@ update msg model =
             InitGameResponse (Err e) ->
                 handleErr e
 
-            InitGameResponse (Ok ( t, h )) ->
-                ( insertHistoryIntoModel h |> addToken t, Cmd.none )
+            InitGameResponse (Ok ( t, s )) ->
+                ( { model | token = t, state = s }, Cmd.none )
 
             Clicked location ->
                 handleClick model location
-
-            LoadHistoryViaHttp ->
-                ( model, getHistory model.token )
-
-            LoadHistoryResponse (Err e) ->
-                handleErr e
-
-            LoadHistoryResponse (Ok h) ->
-                ( insertHistoryIntoModel h, Cmd.none )
-
-            UpdateTextAreaValue v ->
-                ( { model | textareavalue = v }, Cmd.none )
-
-            LoadHistoryFromTextArea ->
-                ( loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel, Cmd.none )
 
             Next ->
                 ( zipNext model, Cmd.none )
@@ -309,23 +272,6 @@ getHint token state =
         Http.send GetHintResponse request
 
 
-getHistory : String -> Cmd Msg
-getHistory token =
-    let
-        request =
-            Http.request
-                { method = "GET"
-                , headers = [ Http.header "authenticationToken" token ]
-                , url = server ++ "getHistory"
-                , body = Http.emptyBody
-                , expect = Http.expectJson gameStateListDecoder
-                , timeout = Nothing
-                , withCredentials = False
-                }
-    in
-        Http.send LoadHistoryResponse request
-
-
 makeMove : String -> GameState -> Mtrx.Location -> Mtrx.Location -> Cmd Msg
 makeMove token state locFrom locTo =
     let
@@ -407,11 +353,6 @@ getCurrentScore token state =
         Http.send GetScoreResponse request
 
 
-loadHistoryFromTextArea : String -> List GameState
-loadHistoryFromTextArea s =
-    s |> Decode.decodeString gameStateListDecoder |> Result.toMaybe |> withDefault []
-
-
 locationDecoder : Decode.Decoder Mtrx.Location
 locationDecoder =
     Decode.map2 Mtrx.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
@@ -437,10 +378,10 @@ gameStateDecoder =
                 _ ->
                     Empty
 
+        --TODO pass board size and read it here
         boardLen =
             11
 
-        --TODO pass board size and read it here
         stringToFields : List Char -> List Field
         stringToFields =
             List.map charToField
@@ -466,18 +407,13 @@ gameStateDecoder =
         Decode.map2 (\a b -> ( a, b )) decodeFieldBoard decodeFieldWhoMoves
 
 
-gameStateListDecoder : Decode.Decoder (List GameState)
-gameStateListDecoder =
-    Decode.field "history" (Decode.list gameStateDecoder)
-
-
-initGameDecoder : Decode.Decoder ( String, List GameState )
+initGameDecoder : Decode.Decoder ( String, GameState )
 initGameDecoder =
     let
         tokenDecoder =
             Decode.field "token" Decode.string
     in
-        Decode.map2 (\a b -> ( a, b )) tokenDecoder gameStateListDecoder
+        Decode.map2 (\a b -> ( a, b )) tokenDecoder gameStateDecoder
 
 
 locationToJsonValue : Mtrx.Location -> Encode.Value
@@ -566,17 +502,6 @@ view model =
             , div []
                 [ Html.text ("Now moves: " ++ toString (Tuple.second model.state))
                 , Html.br [] []
-                , Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
-                , div []
-                    [ Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ]
-                        [ Html.textarea [ Html.Events.onInput UpdateTextAreaValue ] []
-                        , button
-                            [ Html.Attributes.type_ "submit"
-                            , Html.Attributes.disabled False
-                            ]
-                            [ text "Load history from textarea" ]
-                        ]
-                    ]
                 , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
                 , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
                 , Html.button [ onClick GetScore ] [ text ("Get score") ]

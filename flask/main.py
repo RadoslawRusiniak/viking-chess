@@ -20,7 +20,6 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 cors = CORS(app, resources={
     r"/initGame": {"origins": "http://localhost:5000"}
     , r"/getScore": {"origins": "http://localhost:5000"}
-    , r"/getHistory": {"origins": "http://localhost:5000"}
     , r"/getReachablePositions": {"origins": "http://localhost:5000"}
     , r"/makeMove": {"origins": "http://localhost:5000"}
     , r"/getHint": {"origins": "http://localhost:5000"}
@@ -52,13 +51,8 @@ def initGame():
     return jsonify(
     {
         "token": generatedToken,
-        "history":
-        [
-            {
-                "board": e.board.to_string(),
-                "whoMoves": e.current_side
-            }
-        ]
+        "board": e.board.to_string(),
+        "whoMoves": e.current_side
     })
 
 
@@ -71,28 +65,6 @@ def getScore():
     return jsonify(
     {
         "score": 3
-    })
-
-
-@app.route('/getHistory', methods=['GET'])
-@cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
-def getBoard():
-    if (not isCorrectRequest(request.headers)):
-        return None #TODO some error here
-
-    return jsonify(
-    {
-        "history":
-        [
-            {
-                "board": "...aaaaa........a................a....d....aa...ddd...aaa.ddkdd.aaa...ddd...aa....d....a................a........aaaaa...",
-                "whoMoves": 0
-            },
-            {
-                "board": "...aaaaa........a..................a..d....aa...ddd...aaa.ddkdd.aaa...ddd...aa....d....a................a........aaaaa...",
-                "whoMoves": 1
-            }
-        ]
     })
 
 @app.route('/getReachablePositions', methods=['GET'])
