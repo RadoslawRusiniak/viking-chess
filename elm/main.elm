@@ -3,22 +3,21 @@ module Main exposing (main, Model)
 import Html exposing (Html, Attribute, button, div, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
-
 import Maybe exposing (withDefault)
-
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Http
-
 import Matrix as Mtrx exposing (Matrix, square, toList, Location, row, col)
 import Navigation as Nav exposing (program, Location)
 import UrlParser exposing (Parser, top, s, (<?>), stringParam, parsePath)
-
 import List.Split exposing (chunksOfLeft)
 
+
 main : Program Never Model Msg
-main = Nav.program
-        (\_ -> Dummy) --TODO how to ignore
+main =
+    Nav.program
+        (\_ -> Dummy)
+        --TODO how to ignore
         { init = init
         , view = view
         , update = update
@@ -26,14 +25,29 @@ main = Nav.program
         }
 
 
+
 -- MODEL
 
 
-type Field = Empty | Defender | Attacker | King
+type Field
+    = Empty
+    | Defender
+    | Attacker
+    | King
 
-type alias Board = Matrix Field
-type alias WhoMoves = Int
-type alias GameState = (Board, WhoMoves)
+
+type alias Board =
+    Matrix Field
+
+
+type alias WhoMoves =
+    Int
+
+
+type alias GameState =
+    ( Board, WhoMoves )
+
+
 type alias Model =
     { state : GameState
     , clickedLocation : Maybe Mtrx.Location
@@ -46,15 +60,20 @@ type alias Model =
     , token : String
     }
 
-init : Nav.Location -> (Model, Cmd Msg)
+
+init : Nav.Location -> ( Model, Cmd Msg )
 init location =
     let
         parser : Parser (Maybe String -> a) a
-        parser = s "main.elm" <?> stringParam "password" --TODO how to get rid of "main.elm"
-        parsedPassword = parsePath parser location |> withDefault Nothing |> withDefault "wrong"
+        parser =
+            s "main.elm" <?> stringParam "password"
+
+        --TODO how to get rid of "main.elm"
+        parsedPassword =
+            parsePath parser location |> withDefault Nothing |> withDefault "wrong"
     in
-        (Model
-            (square 0 (\_ -> Empty), 1)
+        ( Model
+            ( square 0 (\_ -> Empty), 1 )
             Nothing
             Nothing
             []
@@ -63,146 +82,246 @@ init location =
             ""
             0
             ""
-        , initGame parsedPassword)
+        , initGame parsedPassword
+        )
+
 
 subscriptions : Model -> Sub Msg
-subscriptions _ = Sub.none
+subscriptions _ =
+    Sub.none
+
+
 
 -- UPDATE
 
-type alias HttpRes a = Result Http.Error a
-type alias Move = (Mtrx.Location, Mtrx.Location)
 
-type Msg =
-    Dummy
-    | InitGameResponse (HttpRes (String, List GameState))
+type alias HttpRes a =
+    Result Http.Error a
+
+
+type alias Move =
+    ( Mtrx.Location, Mtrx.Location )
+
+
+type Msg
+    = Dummy
+    | InitGameResponse (HttpRes ( String, List GameState ))
     | Clicked Mtrx.Location
     | LoadHistoryViaHttp
     | LoadHistoryResponse (HttpRes (List GameState))
     | UpdateTextAreaValue String
     | LoadHistoryFromTextArea
-    | Next | Prev
-    | GetScore | GetScoreResponse (HttpRes Float)
+    | Next
+    | Prev
+    | GetScore
+    | GetScoreResponse (HttpRes Float)
     | GetMovesResponse (HttpRes (List Mtrx.Location))
     | MakeMoveResponse (HttpRes GameState)
-    | GetHint | GetHintResponse (HttpRes Move)
+    | GetHint
+    | GetHintResponse (HttpRes Move)
 
-update : Msg -> Model -> (Model, Cmd Msg)
+
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
-        handleErr e = ({ model | errorText = toString e}, Cmd.none)
+        handleErr e =
+            ( { model | errorText = toString e }, Cmd.none )
 
         getHead lst =
             let
-                emptyState = (Mtrx.square 0 (\_ -> Empty), 0)
+                emptyState =
+                    ( Mtrx.square 0 (\_ -> Empty), 0 )
             in
                 List.head lst |> withDefault emptyState
 
-        getTail lst = List.tail lst |> withDefault []
+        getTail lst =
+            List.tail lst |> withDefault []
 
-        insertHistoryIntoModel data = 
+        insertHistoryIntoModel data =
             let
-                rdata = List.reverse data
+                rdata =
+                    List.reverse data
             in
-                {model | historyPrev = getTail rdata, state = getHead rdata, historyNext = [],
-                 clickedLocation = Nothing, possibleMoves = Nothing }
+                { model
+                    | historyPrev = getTail rdata
+                    , state = getHead rdata
+                    , historyNext = []
+                    , clickedLocation = Nothing
+                    , possibleMoves = Nothing
+                }
 
-        addToken t model = { model | token = t }
+        addToken t model =
+            { model | token = t }
 
-        zipNext m = {m | historyPrev = m.state :: m.historyPrev, state = getHead m.historyNext,
-                         historyNext = getTail m.historyNext}
-        zipPrev m = {m | historyPrev = getTail m.historyPrev, state = getHead m.historyPrev,
-                         historyNext = m.state :: m.historyNext}
+        zipNext m =
+            { m
+                | historyPrev = m.state :: m.historyPrev
+                , state = getHead m.historyNext
+                , historyNext = getTail m.historyNext
+            }
 
-        handleClick : Model -> Mtrx.Location -> (Model, Cmd Msg)
+        zipPrev m =
+            { m
+                | historyPrev = getTail m.historyPrev
+                , state = getHead m.historyPrev
+                , historyNext = m.state :: m.historyNext
+            }
+
+        handleClick : Model -> Mtrx.Location -> ( Model, Cmd Msg )
         handleClick model location =
             case model.clickedLocation of
-                Nothing -> ( { model | clickedLocation = Just location },
-                            getReachablePositions model.token model.state location)
-                Just from -> 
+                Nothing ->
+                    ( { model | clickedLocation = Just location }
+                    , getReachablePositions model.token model.state location
+                    )
+
+                Just from ->
                     case List.member location (model.possibleMoves |> withDefault []) of
-                        True -> ( { model | clickedLocation = Nothing }, makeMove model.token model.state from location)
-                        False -> ( { model | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none)
+                        True ->
+                            ( { model | clickedLocation = Nothing }, makeMove model.token model.state from location )
+
+                        False ->
+                            ( { model | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none )
     in
         case msg of
-            Dummy -> (model, Cmd.none)
-            InitGameResponse (Err e) -> handleErr e
-            InitGameResponse (Ok (t, h)) -> (insertHistoryIntoModel h |> addToken t, Cmd.none)
-            Clicked location -> handleClick model location
-            LoadHistoryViaHttp -> (model, getHistory model.token)
-            LoadHistoryResponse (Err e) -> handleErr e
-            LoadHistoryResponse (Ok h) -> (insertHistoryIntoModel h, Cmd.none)
-            UpdateTextAreaValue v -> ( { model | textareavalue = v }, Cmd.none)
-            LoadHistoryFromTextArea -> (loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel, Cmd.none)
-            Next -> (zipNext model, Cmd.none)
-            Prev -> (zipPrev model, Cmd.none)
-            GetScore -> (model, getCurrentScore model.token model.state)
-            GetScoreResponse (Err e) -> handleErr e
-            GetScoreResponse (Ok x) -> ( { model | currentScore = x }, Cmd.none)
-            GetMovesResponse (Err e) -> handleErr e
-            GetMovesResponse (Ok locs) -> ( { model | possibleMoves = Just locs },
-                                            Cmd.none)
-            MakeMoveResponse (Err e) -> handleErr e
-            MakeMoveResponse (Ok s) -> ( { model | errorText = "", state = s, possibleMoves = Nothing, 
-                                         historyPrev = model.state :: model.historyPrev,
-                                         historyNext = [] }, Cmd.none)
-            GetHint -> (model, getHint model.token model.state)
-            GetHintResponse (Err e) -> handleErr e
-            GetHintResponse (Ok (from, to)) -> ( { model | clickedLocation = Just from, possibleMoves = Just [to] },
-                                                Cmd.none)
+            Dummy ->
+                ( model, Cmd.none )
+
+            InitGameResponse (Err e) ->
+                handleErr e
+
+            InitGameResponse (Ok ( t, h )) ->
+                ( insertHistoryIntoModel h |> addToken t, Cmd.none )
+
+            Clicked location ->
+                handleClick model location
+
+            LoadHistoryViaHttp ->
+                ( model, getHistory model.token )
+
+            LoadHistoryResponse (Err e) ->
+                handleErr e
+
+            LoadHistoryResponse (Ok h) ->
+                ( insertHistoryIntoModel h, Cmd.none )
+
+            UpdateTextAreaValue v ->
+                ( { model | textareavalue = v }, Cmd.none )
+
+            LoadHistoryFromTextArea ->
+                ( loadHistoryFromTextArea model.textareavalue |> insertHistoryIntoModel, Cmd.none )
+
+            Next ->
+                ( zipNext model, Cmd.none )
+
+            Prev ->
+                ( zipPrev model, Cmd.none )
+
+            GetScore ->
+                ( model, getCurrentScore model.token model.state )
+
+            GetScoreResponse (Err e) ->
+                handleErr e
+
+            GetScoreResponse (Ok x) ->
+                ( { model | currentScore = x }, Cmd.none )
+
+            GetMovesResponse (Err e) ->
+                handleErr e
+
+            GetMovesResponse (Ok locs) ->
+                ( { model | possibleMoves = Just locs }
+                , Cmd.none
+                )
+
+            MakeMoveResponse (Err e) ->
+                handleErr e
+
+            MakeMoveResponse (Ok s) ->
+                ( { model
+                    | errorText = ""
+                    , state = s
+                    , possibleMoves = Nothing
+                    , historyPrev = model.state :: model.historyPrev
+                    , historyNext = []
+                  }
+                , Cmd.none
+                )
+
+            GetHint ->
+                ( model, getHint model.token model.state )
+
+            GetHintResponse (Err e) ->
+                handleErr e
+
+            GetHintResponse (Ok ( from, to )) ->
+                ( { model | clickedLocation = Just from, possibleMoves = Just [ to ] }
+                , Cmd.none
+                )
+
 
 server : String
-server = "http://localhost:5000/"
+server =
+    "http://localhost:5000/"
+
 
 initGame : String -> Cmd Msg
 initGame pswrd =
     let
-        request = Http.request
-            { method = "GET"
-            , headers = [Http.header "password" pswrd]
-            , url = server ++ "initGame"
-            , body = Http.emptyBody
-            , expect = Http.expectJson initGameDecoder
-            , timeout = Nothing
-            , withCredentials = False
-        }
+        request =
+            Http.request
+                { method = "GET"
+                , headers = [ Http.header "password" pswrd ]
+                , url = server ++ "initGame"
+                , body = Http.emptyBody
+                , expect = Http.expectJson initGameDecoder
+                , timeout = Nothing
+                , withCredentials = False
+                }
     in
         Http.send InitGameResponse request
 
+
 getHint : String -> GameState -> Cmd Msg
-getHint token state = 
+getHint token state =
     let
-        jsonState = stateToJsonValue state |> Encode.encode 0
+        jsonState =
+            stateToJsonValue state |> Encode.encode 0
 
         moveDecoder : Decode.Decoder Move
-        moveDecoder = Decode.map2 ((,)) (Decode.field "from" locationDecoder) (Decode.field "to" locationDecoder)
-        hintDecoder = Decode.field "hint" moveDecoder
+        moveDecoder =
+            Decode.map2 ((,)) (Decode.field "from" locationDecoder) (Decode.field "to" locationDecoder)
 
-        request = Http.request
-            { method = "GET"
-            , headers = [Http.header "authenticationToken" token]
-            , url = server ++ "getHint" ++ "?state=" ++ jsonState
-            , body = Http.emptyBody
-            , expect = Http.expectJson hintDecoder
-            , timeout = Nothing
-            , withCredentials = False
-        }
+        hintDecoder =
+            Decode.field "hint" moveDecoder
+
+        request =
+            Http.request
+                { method = "GET"
+                , headers = [ Http.header "authenticationToken" token ]
+                , url = server ++ "getHint" ++ "?state=" ++ jsonState
+                , body = Http.emptyBody
+                , expect = Http.expectJson hintDecoder
+                , timeout = Nothing
+                , withCredentials = False
+                }
     in
         Http.send GetHintResponse request
-        
+
 
 getHistory : String -> Cmd Msg
 getHistory token =
     let
-        request = Http.request
-            { method = "GET"
-            , headers = [Http.header "authenticationToken" token]
-            , url = server ++ "getHistory"
-            , body = Http.emptyBody
-            , expect = Http.expectJson gameStateListDecoder
-            , timeout = Nothing
-            , withCredentials = False
-        }
+        request =
+            Http.request
+                { method = "GET"
+                , headers = [ Http.header "authenticationToken" token ]
+                , url = server ++ "getHistory"
+                , body = Http.emptyBody
+                , expect = Http.expectJson gameStateListDecoder
+                , timeout = Nothing
+                , withCredentials = False
+                }
     in
         Http.send LoadHistoryResponse request
 
@@ -210,128 +329,206 @@ getHistory token =
 makeMove : String -> GameState -> Mtrx.Location -> Mtrx.Location -> Cmd Msg
 makeMove token state locFrom locTo =
     let
-        jsonState = stateToJsonValue state |> Encode.encode 0
-        jsonLocation loc = loc |> locationToJsonValue |> Encode.encode 0
+        jsonState =
+            stateToJsonValue state |> Encode.encode 0
 
-        request = Http.request
-            { method = "GET"
-            , headers = [Http.header "authenticationToken" token]
-            , url = server ++ "makeMove?state=" ++ jsonState 
-                    ++ "&from=" ++ jsonLocation locFrom ++ "&to=" ++ jsonLocation locTo
-            , body = Http.emptyBody
-            , expect = Http.expectJson gameStateDecoder
-            , timeout = Nothing
-            , withCredentials = False
-        }
+        jsonLocation loc =
+            loc |> locationToJsonValue |> Encode.encode 0
+
+        request =
+            Http.request
+                { method = "GET"
+                , headers = [ Http.header "authenticationToken" token ]
+                , url =
+                    server
+                        ++ "makeMove?state="
+                        ++ jsonState
+                        ++ "&from="
+                        ++ jsonLocation locFrom
+                        ++ "&to="
+                        ++ jsonLocation locTo
+                , body = Http.emptyBody
+                , expect = Http.expectJson gameStateDecoder
+                , timeout = Nothing
+                , withCredentials = False
+                }
     in
         Http.send MakeMoveResponse request
+
 
 getReachablePositions : String -> GameState -> Mtrx.Location -> Cmd Msg
 getReachablePositions token state location =
     let
-        jsonState = stateToJsonValue state |> Encode.encode 0
-        jsonLocation = location |> locationToJsonValue |> Encode.encode 0
+        jsonState =
+            stateToJsonValue state |> Encode.encode 0
+
+        jsonLocation =
+            location |> locationToJsonValue |> Encode.encode 0
 
         listOfMovesDecoder : Decode.Decoder (List Mtrx.Location)
-        listOfMovesDecoder = Decode.field "positions" (Decode.list locationDecoder)
+        listOfMovesDecoder =
+            Decode.field "positions" (Decode.list locationDecoder)
 
-        request = Http.request
-            { method = "GET"
-            , headers = [Http.header "authenticationToken" token]
-            , url = server ++ "getReachablePositions?state=" ++ jsonState ++ "&location=" ++ jsonLocation
-            , body = Http.emptyBody
-            , expect = Http.expectJson listOfMovesDecoder
-            , timeout = Nothing
-            , withCredentials = False
-        }
+        request =
+            Http.request
+                { method = "GET"
+                , headers = [ Http.header "authenticationToken" token ]
+                , url = server ++ "getReachablePositions?state=" ++ jsonState ++ "&location=" ++ jsonLocation
+                , body = Http.emptyBody
+                , expect = Http.expectJson listOfMovesDecoder
+                , timeout = Nothing
+                , withCredentials = False
+                }
     in
         Http.send GetMovesResponse request
+
 
 getCurrentScore : String -> GameState -> Cmd Msg
 getCurrentScore token state =
     let
-        jsonVal = stateToJsonValue state
+        jsonVal =
+            stateToJsonValue state
+
         getScoreDecoder : Decode.Decoder Float
-        getScoreDecoder = Decode.field "score" Decode.float
-        
-        request = Http.request
-            { method = "GET"
-            , headers = [Http.header "authenticationToken" token]
-            , url = server ++ "getScore?state=" ++ (Encode.encode 0 jsonVal)
-            , body = Http.emptyBody
-            , expect = Http.expectJson getScoreDecoder
-            , timeout = Nothing
-            , withCredentials = False
-        }
+        getScoreDecoder =
+            Decode.field "score" Decode.float
+
+        request =
+            Http.request
+                { method = "GET"
+                , headers = [ Http.header "authenticationToken" token ]
+                , url = server ++ "getScore?state=" ++ (Encode.encode 0 jsonVal)
+                , body = Http.emptyBody
+                , expect = Http.expectJson getScoreDecoder
+                , timeout = Nothing
+                , withCredentials = False
+                }
     in
         Http.send GetScoreResponse request
 
+
 loadHistoryFromTextArea : String -> List GameState
-loadHistoryFromTextArea s = s |> Decode.decodeString gameStateListDecoder |> Result.toMaybe |> withDefault []
+loadHistoryFromTextArea s =
+    s |> Decode.decodeString gameStateListDecoder |> Result.toMaybe |> withDefault []
+
 
 locationDecoder : Decode.Decoder Mtrx.Location
-locationDecoder = Decode.map2 Mtrx.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
+locationDecoder =
+    Decode.map2 Mtrx.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
+
 
 gameStateDecoder : Decode.Decoder GameState
 gameStateDecoder =
     let
-        charToField c =  case c of
-            '.' -> Empty
-            'a' -> Attacker
-            'd' -> Defender
-            'k' -> King
-            _ -> Empty
-        boardLen = 11 --TODO pass board size and read it here
+        charToField c =
+            case c of
+                '.' ->
+                    Empty
+
+                'a' ->
+                    Attacker
+
+                'd' ->
+                    Defender
+
+                'k' ->
+                    King
+
+                _ ->
+                    Empty
+
+        boardLen =
+            11
+
+        --TODO pass board size and read it here
         stringToFields : List Char -> List Field
-        stringToFields = List.map charToField
+        stringToFields =
+            List.map charToField
+
         strings : String -> List (List Char)
-        strings s = String.toList s |> chunksOfLeft boardLen
+        strings s =
+            String.toList s |> chunksOfLeft boardLen
+
         decodeFields : Decode.Decoder (List (List Field))
-        decodeFields = Decode.string |> Decode.andThen (\x -> x |> strings |> List.map stringToFields |> Decode.succeed)
+        decodeFields =
+            Decode.string |> Decode.andThen (\x -> x |> strings |> List.map stringToFields |> Decode.succeed)
+
         decodeBoard : Decode.Decoder Board
-        decodeBoard = decodeFields |> Decode.andThen (\l -> l |> Mtrx.fromList |> Decode.succeed)
-        decodeFieldBoard = Decode.field "board" decodeBoard
-        decodeFieldWhoMoves = Decode.field "whoMoves" Decode.int
+        decodeBoard =
+            decodeFields |> Decode.andThen (\l -> l |> Mtrx.fromList |> Decode.succeed)
+
+        decodeFieldBoard =
+            Decode.field "board" decodeBoard
+
+        decodeFieldWhoMoves =
+            Decode.field "whoMoves" Decode.int
     in
-        Decode.map2 (\a b -> (a,b)) decodeFieldBoard decodeFieldWhoMoves
+        Decode.map2 (\a b -> ( a, b )) decodeFieldBoard decodeFieldWhoMoves
+
 
 gameStateListDecoder : Decode.Decoder (List GameState)
-gameStateListDecoder = Decode.field "history" (Decode.list gameStateDecoder)
+gameStateListDecoder =
+    Decode.field "history" (Decode.list gameStateDecoder)
 
-initGameDecoder : Decode.Decoder (String, List GameState)
+
+initGameDecoder : Decode.Decoder ( String, List GameState )
 initGameDecoder =
     let
-        tokenDecoder = Decode.field "token" Decode.string
+        tokenDecoder =
+            Decode.field "token" Decode.string
     in
-        Decode.map2 (\a b -> (a,b)) tokenDecoder gameStateListDecoder
+        Decode.map2 (\a b -> ( a, b )) tokenDecoder gameStateListDecoder
+
 
 locationToJsonValue : Mtrx.Location -> Encode.Value
-locationToJsonValue location = 
+locationToJsonValue location =
     let
-        asObject loc = 
+        asObject loc =
             let
-                x = Mtrx.row loc |> Encode.int
-                y = Mtrx.col loc |> Encode.int
+                x =
+                    Mtrx.row loc |> Encode.int
+
+                y =
+                    Mtrx.col loc |> Encode.int
             in
-                Encode.object [("row", x), ("column", y)]
-        asLocationObject loc = Encode.object [("location", loc)]
+                Encode.object [ ( "row", x ), ( "column", y ) ]
+
+        asLocationObject loc =
+            Encode.object [ ( "location", loc ) ]
     in
-        location |> asObject |> asLocationObject 
+        location |> asObject |> asLocationObject
+
 
 stateToJsonValue : GameState -> Encode.Value
-stateToJsonValue (b, who) =
+stateToJsonValue ( b, who ) =
     let
-        fieldToChar field = case field of
-            Empty       -> '.'
-            Defender    -> 'd'
-            Attacker    -> 'a'
-            King        -> 'k'
+        fieldToChar field =
+            case field of
+                Empty ->
+                    '.'
+
+                Defender ->
+                    'd'
+
+                Attacker ->
+                    'a'
+
+                King ->
+                    'k'
+
         toRows : Board -> List String
-        toRows b = b |> Mtrx.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
-        boardToJsonValue b = b |> toRows |> List.map Encode.string |> Encode.list
-        whoToJsonValue = Encode.int
+        toRows b =
+            b |> Mtrx.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
+
+        boardToJsonValue b =
+            b |> toRows |> List.map Encode.string |> Encode.list
+
+        whoToJsonValue =
+            Encode.int
     in
-        Encode.object [("board", boardToJsonValue b), ("whoMoves", whoToJsonValue who)]
+        Encode.object [ ( "board", boardToJsonValue b ), ( "whoMoves", whoToJsonValue who ) ]
+
+
 
 -- VIEW
 
@@ -339,70 +536,102 @@ stateToJsonValue (b, who) =
 view : Model -> Html Msg
 view model =
     let
-        isHighlighted lc = case model.possibleMoves of
-            Nothing -> False
-            Just moves -> List.member lc moves
-        isClicked lc = case model.clickedLocation of
-            Nothing -> False
-            Just clicked -> lc == clicked
-        fieldColors elem location = pickColors elem (isHighlighted location) (isClicked location) 
+        isHighlighted lc =
+            case model.possibleMoves of
+                Nothing ->
+                    False
+
+                Just moves ->
+                    List.member lc moves
+
+        isClicked lc =
+            case model.clickedLocation of
+                Nothing ->
+                    False
+
+                Just clicked ->
+                    lc == clicked
+
+        fieldColors elem location =
+            pickColors elem (isHighlighted location) (isClicked location)
     in
-        div [ style [("display", "flex"), ("flex-direction", "row")] ] [
-            div [] (
-                model.state |> Tuple.first
+        div [ style [ ( "display", "flex" ), ( "flex-direction", "row" ) ] ]
+            [ div []
+                (model.state
+                    |> Tuple.first
                     |> Mtrx.mapWithLocation (\loc elem -> div [ myStyle (fieldColors elem loc), onClick (Clicked loc) ] [])
                     |> Mtrx.toList
-                    |> List.map (div [ style [("height", "56px")]])
-            )
-            , div [] [
-                Html.text ("Now moves: " ++ toString (Tuple.second model.state)), Html.br [] []
+                    |> List.map (div [ style [ ( "height", "56px" ) ] ])
+                )
+            , div []
+                [ Html.text ("Now moves: " ++ toString (Tuple.second model.state))
+                , Html.br [] []
                 , Html.button [ onClick LoadHistoryViaHttp ] [ text "Load history via http" ]
-                , div [] [
-                    Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ] [
-                        Html.textarea [ Html.Events.onInput UpdateTextAreaValue ] []
-                        ,             
-                        button
+                , div []
+                    [ Html.form [ Html.Events.onSubmit LoadHistoryFromTextArea ]
+                        [ Html.textarea [ Html.Events.onInput UpdateTextAreaValue ] []
+                        , button
                             [ Html.Attributes.type_ "submit"
-                                , Html.Attributes.disabled False
+                            , Html.Attributes.disabled False
                             ]
                             [ text "Load history from textarea" ]
+                        ]
                     ]
-                ]
                 , Html.button [ onClick Prev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
                 , Html.button [ onClick Next, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
                 , Html.button [ onClick GetScore ] [ text ("Get score") ]
                 , Html.text (toString model.currentScore)
                 , Html.button [ onClick GetHint ] [ text ("Get hint") ]
                 , div [ errStyle ] [ text model.errorText ]
+                ]
             ]
-        ]
 
-type alias IsHighlighted = Bool
-type alias IsClicked = Bool
-pickColors : Field -> IsHighlighted -> IsClicked -> (String, String)
-pickColors f h c = 
-    (
-        case f of
-            Empty       -> "peru"
-            Defender    -> "white"
-            Attacker    -> "grey"
-            King        -> "purple"
-    ,
-        if h then "orange" else if c then "red" else "black"
+
+type alias IsHighlighted =
+    Bool
+
+
+type alias IsClicked =
+    Bool
+
+
+pickColors : Field -> IsHighlighted -> IsClicked -> ( String, String )
+pickColors f h c =
+    ( case f of
+        Empty ->
+            "peru"
+
+        Defender ->
+            "white"
+
+        Attacker ->
+            "grey"
+
+        King ->
+            "purple"
+    , if h then
+        "orange"
+      else if c then
+        "red"
+      else
+        "black"
     )
 
-errStyle : Attribute Msg
-errStyle = style [
-      ("height", "100px")
-    , ("width", "100px")
-    ]
 
-myStyle : (String, String) -> Attribute Msg
-myStyle (background, border) =
+errStyle : Attribute Msg
+errStyle =
     style
-        [ ("backgroundColor", background)
-        , ("height", "50px")
-        , ("width", "50px")
-        , ("border", "3px solid " ++ border)
-        , ("display", "inline-block")
+        [ ( "height", "100px" )
+        , ( "width", "100px" )
+        ]
+
+
+myStyle : ( String, String ) -> Attribute Msg
+myStyle ( background, border ) =
+    style
+        [ ( "backgroundColor", background )
+        , ( "height", "50px" )
+        , ( "width", "50px" )
+        , ( "border", "3px solid " ++ border )
+        , ( "display", "inline-block" )
         ]
