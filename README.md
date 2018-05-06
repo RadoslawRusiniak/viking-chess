@@ -13,18 +13,14 @@ Prerequisites:
 0. Knowing authentication token. For now it's secret for me and someone somewhere. Without it server will not respond.
 
 1. Elm lang. https://guide.elm-lang.org/install.html
-2. Python lang. https://www.python.org/downloads/
-3. Flask. After Python is installed run:
+2. Python lang. https://www.python.org/downloads/ You need version >= 3.6.
+3. Python packages. Navigate to project root and run:
 
-    pip install flask
+    pip install -r python_requirements.txt
 
-4. Flask-cors and passlib. After flask is installed run:
+Note: if you are using Windows with virtualenv then instead of "pip install ..." you may try "python -m pip install ...". Workaround, I know, but working one.
 
-    pip install flask-cors
-
-    pip install passlib
-
-5. Elm packages. Navigate to project, then to elm subdirectory and run:
+4. Elm packages. Navigate to project root, then to elm subdirectory and run:
 
     elm package install
 
