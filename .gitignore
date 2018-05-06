@@ -4,4 +4,4 @@ elm-stuff/
 *.swo
 *.pyc
 betafl/
-*requirements.txt
+flask/requirements.txt
