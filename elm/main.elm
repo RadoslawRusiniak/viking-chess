@@ -48,10 +48,16 @@ type alias GameState =
     ( Board, WhoMoves )
 
 
+type alias Move =
+    ( Mtrx.Location, Mtrx.Location )
+
+
+
 type alias Model =
     { state : GameState
     , clickedLocation : Maybe Mtrx.Location
     , possibleMoves : Maybe (List Mtrx.Location)
+    , hint : Maybe Move
     , historyPrev : List GameState
     , historyNext : List GameState
     , errorText : String
@@ -75,6 +81,7 @@ init location =
             ( square 0 (\_ -> Empty), 1 )
             Nothing
             Nothing
+            Nothing
             []
             []
             ""
@@ -95,11 +102,6 @@ subscriptions _ =
 
 type alias HttpRes a =
     Result Http.Error a
-
-
-type alias Move =
-    ( Mtrx.Location, Mtrx.Location )
-
 
 type Msg
     = Dummy
@@ -193,7 +195,7 @@ update msg model =
                 handleErr e
 
             GetMovesResponse (Ok locs) ->
-                ( { model | possibleMoves = Just locs }
+                ( { model | possibleMoves = Just locs, hint = Nothing }
                 , Cmd.none
                 )
 
@@ -205,6 +207,7 @@ update msg model =
                     | errorText = ""
                     , state = s
                     , possibleMoves = Nothing
+                    , hint = Nothing
                     , historyPrev = model.state :: model.historyPrev
                     , historyNext = []
                   }
@@ -217,8 +220,8 @@ update msg model =
             GetHintResponse (Err e) ->
                 handleErr e
 
-            GetHintResponse (Ok ( from, to )) ->
-                ( { model | clickedLocation = Just from, possibleMoves = Just [ to ] }
+            GetHintResponse (Ok mv) ->
+                ( { model | clickedLocation = Nothing, possibleMoves = Nothing, hint = Just mv }
                 , Cmd.none
                 )
 
@@ -487,9 +490,17 @@ view model =
 
                 Just clicked ->
                     lc == clicked
+        
+        isPartOfHint lc =
+            case model.hint of
+                Nothing ->
+                    False
+
+                Just (from, to) ->
+                    lc == from || lc == to
 
         getFieldStyle loc =
-            fieldStyle (isHighlighted loc) (isClicked loc)
+            fieldStyle (isHighlighted loc) (isClicked loc) (isPartOfHint loc)
 
         --TODO maybe nicer way of handling empty field
         setPawn elem =
@@ -519,14 +530,6 @@ view model =
             ]
 
 
-type alias IsHighlighted =
-    Bool
-
-
-type alias IsClicked =
-    Bool
-
-
 errStyle : Attribute Msg
 errStyle =
     style
@@ -535,13 +538,26 @@ errStyle =
         ]
 
 
-fieldStyle : IsHighlighted -> IsClicked -> Attribute Msg
-fieldStyle h c =
+type alias IsHighlighted =
+    Bool
+
+
+type alias IsClicked =
+    Bool
+
+type alias IsPartOfHint =
+    Bool
+
+
+fieldStyle : IsHighlighted -> IsClicked -> IsPartOfHint -> Attribute Msg
+fieldStyle highlighted clicked hint =
     let
         background =
-            if h then
+            if hint then
+                "green"
+            else if highlighted then
                 "orange"
-            else if c then
+            else if clicked then
                 "red"
             else
                 "peru"
