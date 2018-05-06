@@ -136,7 +136,7 @@ initGameDecoder =
         Decode.map2 (\a b -> ( a, b )) tokenDecoder gameStateDecoder
 
 
-locationEncoder : Matrix.Location -> Encode.Value
+locationEncoder : Matrix.Location -> String
 locationEncoder location =
     let
         asObject loc =
@@ -152,10 +152,10 @@ locationEncoder location =
         asLocationObject loc =
             Encode.object [ ( "location", loc ) ]
     in
-        location |> asObject |> asLocationObject
+        location |> asObject |> asLocationObject |> Encode.encode 0
 
 
-stateEncoder : GameState -> Encode.Value
+stateEncoder : GameState -> String
 stateEncoder ( b, who ) =
     let
         fieldToChar field =
@@ -182,7 +182,7 @@ stateEncoder ( b, who ) =
         whoToJsonValue =
             Encode.int
     in
-        Encode.object [ ( "board", boardToJsonValue b ), ( "whoMoves", whoToJsonValue who ) ]
+        Encode.object [ ( "board", boardToJsonValue b ), ( "whoMoves", whoToJsonValue who ) ] |> Encode.encode 0
 
 
 

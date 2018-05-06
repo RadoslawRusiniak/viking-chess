@@ -210,7 +210,7 @@ getHint : String -> GameState -> Cmd Msg
 getHint token state =
     let
         jsonState =
-            Model.stateEncoder state |> Encode.encode 0
+            Model.stateEncoder state
 
         moveDecoder : Decode.Decoder Move
         moveDecoder =
@@ -237,10 +237,10 @@ makeMove : String -> GameState -> Mtrx.Location -> Mtrx.Location -> Cmd Msg
 makeMove token state locFrom locTo =
     let
         jsonState =
-            Model.stateEncoder state |> Encode.encode 0
+            Model.stateEncoder state
 
         jsonLocation loc =
-            loc |> Model.locationEncoder |> Encode.encode 0
+            Model.locationEncoder loc
 
         request =
             Http.request
@@ -267,10 +267,10 @@ getReachablePositions : String -> GameState -> Mtrx.Location -> Cmd Msg
 getReachablePositions token state location =
     let
         jsonState =
-            Model.stateEncoder state |> Encode.encode 0
+            Model.stateEncoder state
 
         jsonLocation =
-            location |> Model.locationEncoder |> Encode.encode 0
+            Model.locationEncoder location
 
         listOfMovesDecoder : Decode.Decoder (List Mtrx.Location)
         listOfMovesDecoder =
@@ -304,7 +304,7 @@ getCurrentScore token state =
             Http.request
                 { method = "GET"
                 , headers = [ Http.header "authenticationToken" token ]
-                , url = server ++ "getScore?state=" ++ (Encode.encode 0 jsonVal)
+                , url = server ++ "getScore?state=" ++ jsonVal
                 , body = Http.emptyBody
                 , expect = Http.expectJson getScoreDecoder
                 , timeout = Nothing
