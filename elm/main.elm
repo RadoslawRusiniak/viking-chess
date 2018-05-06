@@ -1,4 +1,4 @@
-module Main exposing (main, Model)
+module Main exposing (main)
 
 import Html exposing (Html, Attribute, button, div, text)
 import Html.Attributes exposing (style)
@@ -7,10 +7,12 @@ import Maybe exposing (withDefault)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Http
+
 import Matrix as Mtrx exposing (Matrix, square, toList, Location, row, col)
 import Navigation as Nav exposing (program, Location)
 import UrlParser exposing (Parser, top, s, (<?>), stringParam, parsePath)
-import List.Split exposing (chunksOfLeft)
+
+import Model exposing (Model, GameState, Board, Field, Move, WhoMoves)
 
 
 main : Program Never Model Msg
@@ -25,45 +27,9 @@ main =
         }
 
 
-
--- MODEL
-
-
-type Field
-    = Empty
-    | Defender
-    | Attacker
-    | King
-
-
-type alias Board =
-    Matrix Field
-
-
-type alias WhoMoves =
-    Int
-
-
-type alias GameState =
-    ( Board, WhoMoves )
-
-
-type alias Move =
-    ( Mtrx.Location, Mtrx.Location )
-
-
-
-type alias Model =
-    { state : GameState
-    , clickedLocation : Maybe Mtrx.Location
-    , possibleMoves : Maybe (List Mtrx.Location)
-    , hint : Maybe Move
-    , historyPrev : List GameState
-    , historyNext : List GameState
-    , errorText : String
-    , currentScore : Float
-    , token : String
-    }
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Sub.none
 
 
 init : Nav.Location -> ( Model, Cmd Msg )
@@ -77,8 +43,8 @@ init location =
         parsedPassword =
             parsePath parser location |> withDefault Nothing |> withDefault "wrong"
     in
-        ( Model
-            ( square 0 (\_ -> Empty), 1 )
+        ( Model.Model
+            Model.emptyState
             Nothing
             Nothing
             Nothing
@@ -91,17 +57,9 @@ init location =
         )
 
 
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
-
-
-
--- UPDATE
-
-
 type alias HttpRes a =
     Result Http.Error a
+
 
 type Msg
     = Dummy
@@ -117,6 +75,10 @@ type Msg
     | GetHintResponse (HttpRes Move)
 
 
+
+-- UPDATE
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
@@ -124,11 +86,7 @@ update msg model =
             ( { model | errorText = toString e }, Cmd.none )
 
         getHead lst =
-            let
-                emptyState =
-                    ( Mtrx.square 0 (\_ -> Empty), 0 )
-            in
-                List.head lst |> withDefault emptyState
+            List.head lst |> withDefault Model.emptyState
 
         getTail lst =
             List.tail lst |> withDefault []
@@ -240,7 +198,7 @@ initGame pswrd =
                 , headers = [ Http.header "password" pswrd ]
                 , url = server ++ "initGame"
                 , body = Http.emptyBody
-                , expect = Http.expectJson initGameDecoder
+                , expect = Http.expectJson Model.initGameDecoder
                 , timeout = Nothing
                 , withCredentials = False
                 }
@@ -252,11 +210,11 @@ getHint : String -> GameState -> Cmd Msg
 getHint token state =
     let
         jsonState =
-            stateToJsonValue state |> Encode.encode 0
+            Model.stateEncoder state |> Encode.encode 0
 
         moveDecoder : Decode.Decoder Move
         moveDecoder =
-            Decode.map2 ((,)) (Decode.field "from" locationDecoder) (Decode.field "to" locationDecoder)
+            Decode.map2 ((,)) (Decode.field "from" Model.locationDecoder) (Decode.field "to" Model.locationDecoder)
 
         hintDecoder =
             Decode.field "hint" moveDecoder
@@ -279,10 +237,10 @@ makeMove : String -> GameState -> Mtrx.Location -> Mtrx.Location -> Cmd Msg
 makeMove token state locFrom locTo =
     let
         jsonState =
-            stateToJsonValue state |> Encode.encode 0
+            Model.stateEncoder state |> Encode.encode 0
 
         jsonLocation loc =
-            loc |> locationToJsonValue |> Encode.encode 0
+            loc |> Model.locationEncoder |> Encode.encode 0
 
         request =
             Http.request
@@ -297,7 +255,7 @@ makeMove token state locFrom locTo =
                         ++ "&to="
                         ++ jsonLocation locTo
                 , body = Http.emptyBody
-                , expect = Http.expectJson gameStateDecoder
+                , expect = Http.expectJson Model.gameStateDecoder
                 , timeout = Nothing
                 , withCredentials = False
                 }
@@ -309,14 +267,14 @@ getReachablePositions : String -> GameState -> Mtrx.Location -> Cmd Msg
 getReachablePositions token state location =
     let
         jsonState =
-            stateToJsonValue state |> Encode.encode 0
+            Model.stateEncoder state |> Encode.encode 0
 
         jsonLocation =
-            location |> locationToJsonValue |> Encode.encode 0
+            location |> Model.locationEncoder |> Encode.encode 0
 
         listOfMovesDecoder : Decode.Decoder (List Mtrx.Location)
         listOfMovesDecoder =
-            Decode.field "positions" (Decode.list locationDecoder)
+            Decode.field "positions" (Decode.list Model.locationDecoder)
 
         request =
             Http.request
@@ -336,7 +294,7 @@ getCurrentScore : String -> GameState -> Cmd Msg
 getCurrentScore token state =
     let
         jsonVal =
-            stateToJsonValue state
+            Model.stateEncoder state
 
         getScoreDecoder : Decode.Decoder Float
         getScoreDecoder =
@@ -354,118 +312,6 @@ getCurrentScore token state =
                 }
     in
         Http.send GetScoreResponse request
-
-
-locationDecoder : Decode.Decoder Mtrx.Location
-locationDecoder =
-    Decode.map2 Mtrx.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
-
-
-gameStateDecoder : Decode.Decoder GameState
-gameStateDecoder =
-    let
-        charToField c =
-            case c of
-                '.' ->
-                    Empty
-
-                'a' ->
-                    Attacker
-
-                'd' ->
-                    Defender
-
-                'k' ->
-                    King
-
-                _ ->
-                    Empty
-
-        --TODO pass board size and read it here
-        boardLen =
-            11
-
-        stringToFields : List Char -> List Field
-        stringToFields =
-            List.map charToField
-
-        strings : String -> List (List Char)
-        strings s =
-            String.toList s |> chunksOfLeft boardLen
-
-        decodeFields : Decode.Decoder (List (List Field))
-        decodeFields =
-            Decode.string |> Decode.andThen (\x -> x |> strings |> List.map stringToFields |> Decode.succeed)
-
-        decodeBoard : Decode.Decoder Board
-        decodeBoard =
-            decodeFields |> Decode.andThen (\l -> l |> Mtrx.fromList |> Decode.succeed)
-
-        decodeFieldBoard =
-            Decode.field "board" decodeBoard
-
-        decodeFieldWhoMoves =
-            Decode.field "whoMoves" Decode.int
-    in
-        Decode.map2 (\a b -> ( a, b )) decodeFieldBoard decodeFieldWhoMoves
-
-
-initGameDecoder : Decode.Decoder ( String, GameState )
-initGameDecoder =
-    let
-        tokenDecoder =
-            Decode.field "token" Decode.string
-    in
-        Decode.map2 (\a b -> ( a, b )) tokenDecoder gameStateDecoder
-
-
-locationToJsonValue : Mtrx.Location -> Encode.Value
-locationToJsonValue location =
-    let
-        asObject loc =
-            let
-                x =
-                    Mtrx.row loc |> Encode.int
-
-                y =
-                    Mtrx.col loc |> Encode.int
-            in
-                Encode.object [ ( "row", x ), ( "column", y ) ]
-
-        asLocationObject loc =
-            Encode.object [ ( "location", loc ) ]
-    in
-        location |> asObject |> asLocationObject
-
-
-stateToJsonValue : GameState -> Encode.Value
-stateToJsonValue ( b, who ) =
-    let
-        fieldToChar field =
-            case field of
-                Empty ->
-                    '.'
-
-                Defender ->
-                    'd'
-
-                Attacker ->
-                    'a'
-
-                King ->
-                    'k'
-
-        toRows : Board -> List String
-        toRows b =
-            b |> Mtrx.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
-
-        boardToJsonValue b =
-            b |> toRows |> List.map Encode.string |> Encode.list
-
-        whoToJsonValue =
-            Encode.int
-    in
-        Encode.object [ ( "board", boardToJsonValue b ), ( "whoMoves", whoToJsonValue who ) ]
 
 
 
@@ -490,13 +336,13 @@ view model =
 
                 Just clicked ->
                     lc == clicked
-        
+
         isPartOfHint lc =
             case model.hint of
                 Nothing ->
                     False
 
-                Just (from, to) ->
+                Just ( from, to ) ->
                     lc == from || lc == to
 
         getFieldStyle loc =
@@ -504,7 +350,7 @@ view model =
 
         --TODO maybe nicer way of handling empty field
         setPawn elem =
-            if elem == Empty then
+            if Model.isEmptyField elem then
                 div [] []
             else
                 div [ pawnStyle elem ] []
@@ -545,6 +391,7 @@ type alias IsHighlighted =
 type alias IsClicked =
     Bool
 
+
 type alias IsPartOfHint =
     Bool
 
@@ -575,18 +422,7 @@ pawnStyle : Field -> Attribute Msg
 pawnStyle f =
     let
         background =
-            case f of
-                Empty ->
-                    "peru"
-
-                Defender ->
-                    "white"
-
-                Attacker ->
-                    "grey"
-
-                King ->
-                    "purple"
+            Model.representationColor f
     in
         style
             [ ( "backgroundColor", background )
