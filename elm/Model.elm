@@ -98,25 +98,20 @@ gameStateDecoder =
                 _ ->
                     Empty
 
-        --TODO pass board size and read it here
-        boardLen =
-            11
-
-        stringToFields : List Char -> List Field
-        stringToFields =
-            List.map charToField
-
-        strings : String -> List (List Char)
-        strings s =
-            String.toList s |> chunksOfLeft boardLen
-
         decodeFields : Decode.Decoder (List (List Field))
         decodeFields =
-            Decode.string |> Decode.andThen (\x -> x |> strings |> List.map stringToFields |> Decode.succeed)
+            let
+                toFields = List.map charToField
+                --TODO pass board size and read it here
+                boardLen = 11
+                toRows = chunksOfLeft boardLen
+                stringTo2DFields = String.toList >> toFields >> toRows
+            in
+                Decode.string |> Decode.andThen (stringTo2DFields >> Decode.succeed)
 
         decodeBoard : Decode.Decoder Board
         decodeBoard =
-            decodeFields |> Decode.andThen (\l -> l |> Matrix.fromList |> Decode.succeed)
+            decodeFields |> Decode.andThen (Matrix.fromList >> Decode.succeed)
 
         decodeFieldBoard =
             Decode.field "board" decodeBoard
@@ -124,7 +119,7 @@ gameStateDecoder =
         decodeFieldWhoMoves =
             Decode.field "whoMoves" Decode.int
     in
-        Decode.map2 (\a b -> ( a, b )) decodeFieldBoard decodeFieldWhoMoves
+        Decode.map2 (,) decodeFieldBoard decodeFieldWhoMoves
 
 
 initGameDecoder : Decode.Decoder ( String, GameState )
@@ -133,11 +128,11 @@ initGameDecoder =
         tokenDecoder =
             Decode.field "token" Decode.string
     in
-        Decode.map2 (\a b -> ( a, b )) tokenDecoder gameStateDecoder
+        Decode.map2 (,) tokenDecoder gameStateDecoder
 
 
 locationEncoder : Matrix.Location -> String
-locationEncoder location =
+locationEncoder =
     let
         asObject loc =
             let
@@ -152,7 +147,7 @@ locationEncoder location =
         asLocationObject loc =
             Encode.object [ ( "location", loc ) ]
     in
-        location |> asObject |> asLocationObject |> Encode.encode 0
+        asObject >> asLocationObject >> Encode.encode 0
 
 
 stateEncoder : GameState -> String
@@ -173,11 +168,11 @@ stateEncoder ( b, who ) =
                     'k'
 
         toRows : Board -> List String
-        toRows b =
-            b |> Matrix.toList |> List.map (\inner -> inner |> List.map fieldToChar |> String.fromList)
+        toRows =
+            Matrix.toList >> List.map (List.map fieldToChar >> String.fromList)
 
-        boardToJsonValue b =
-            b |> toRows |> List.map Encode.string |> Encode.list
+        boardToJsonValue =
+            toRows >> List.map Encode.string >> Encode.list
 
         whoToJsonValue =
             Encode.int

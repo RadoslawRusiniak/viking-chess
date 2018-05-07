@@ -7,11 +7,9 @@ import Maybe exposing (withDefault)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Http
-
 import Matrix as Mtrx exposing (Matrix, square, toList, Location, row, col)
 import Navigation as Nav exposing (program, Location)
 import UrlParser exposing (Parser, top, s, (<?>), stringParam, parsePath)
-
 import Model exposing (Model, GameState, Board, Field, Move, WhoMoves)
 
 
@@ -40,8 +38,8 @@ init location =
         parser =
             s "main.elm" <?> stringParam "password"
 
-        parsedPassword =
-            parsePath parser location |> withDefault Nothing |> withDefault "wrong"
+        parsePassword =
+            parsePath parser >> withDefault Nothing >> withDefault "wrong"
     in
         ( Model.Model
             Model.emptyState
@@ -53,7 +51,7 @@ init location =
             ""
             0
             ""
-        , initGame parsedPassword
+        , initGame <| parsePassword location
         )
 
 
@@ -85,11 +83,11 @@ update msg model =
         handleErr e =
             ( { model | errorText = toString e }, Cmd.none )
 
-        getHead lst =
-            List.head lst |> withDefault Model.emptyState
+        getHead =
+            List.head >> withDefault Model.emptyState
 
-        getTail lst =
-            List.tail lst |> withDefault []
+        getTail =
+            List.tail >> withDefault []
 
         zipNext m =
             { m
@@ -209,12 +207,9 @@ initGame pswrd =
 getHint : String -> GameState -> Cmd Msg
 getHint token state =
     let
-        jsonState =
-            Model.stateEncoder state
-
         moveDecoder : Decode.Decoder Move
         moveDecoder =
-            Decode.map2 ((,)) (Decode.field "from" Model.locationDecoder) (Decode.field "to" Model.locationDecoder)
+            Decode.map2 (,) (Decode.field "from" Model.locationDecoder) (Decode.field "to" Model.locationDecoder)
 
         hintDecoder =
             Decode.field "hint" moveDecoder
@@ -223,7 +218,11 @@ getHint token state =
             Http.request
                 { method = "GET"
                 , headers = [ Http.header "authenticationToken" token ]
-                , url = server ++ "getHint" ++ "?state=" ++ jsonState
+                , url =
+                    server
+                        ++ "getHint"
+                        ++ "?state="
+                        ++ Model.stateEncoder state
                 , body = Http.emptyBody
                 , expect = Http.expectJson hintDecoder
                 , timeout = Nothing
@@ -236,24 +235,19 @@ getHint token state =
 makeMove : String -> GameState -> Mtrx.Location -> Mtrx.Location -> Cmd Msg
 makeMove token state locFrom locTo =
     let
-        jsonState =
-            Model.stateEncoder state
-
-        jsonLocation loc =
-            Model.locationEncoder loc
-
         request =
             Http.request
                 { method = "GET"
                 , headers = [ Http.header "authenticationToken" token ]
                 , url =
                     server
-                        ++ "makeMove?state="
-                        ++ jsonState
+                        ++ "makeMove"
+                        ++ "?state="
+                        ++ Model.stateEncoder state
                         ++ "&from="
-                        ++ jsonLocation locFrom
+                        ++ Model.locationEncoder locFrom
                         ++ "&to="
-                        ++ jsonLocation locTo
+                        ++ Model.locationEncoder locTo
                 , body = Http.emptyBody
                 , expect = Http.expectJson Model.gameStateDecoder
                 , timeout = Nothing
@@ -266,12 +260,6 @@ makeMove token state locFrom locTo =
 getReachablePositions : String -> GameState -> Mtrx.Location -> Cmd Msg
 getReachablePositions token state location =
     let
-        jsonState =
-            Model.stateEncoder state
-
-        jsonLocation =
-            Model.locationEncoder location
-
         listOfMovesDecoder : Decode.Decoder (List Mtrx.Location)
         listOfMovesDecoder =
             Decode.field "positions" (Decode.list Model.locationDecoder)
@@ -280,7 +268,13 @@ getReachablePositions token state location =
             Http.request
                 { method = "GET"
                 , headers = [ Http.header "authenticationToken" token ]
-                , url = server ++ "getReachablePositions?state=" ++ jsonState ++ "&location=" ++ jsonLocation
+                , url =
+                    server
+                        ++ "getReachablePositions"
+                        ++ "?state="
+                        ++ Model.stateEncoder state
+                        ++ "&location="
+                        ++ Model.locationEncoder location
                 , body = Http.emptyBody
                 , expect = Http.expectJson listOfMovesDecoder
                 , timeout = Nothing
@@ -293,9 +287,6 @@ getReachablePositions token state location =
 getCurrentScore : String -> GameState -> Cmd Msg
 getCurrentScore token state =
     let
-        jsonVal =
-            Model.stateEncoder state
-
         getScoreDecoder : Decode.Decoder Float
         getScoreDecoder =
             Decode.field "score" Decode.float
@@ -304,7 +295,11 @@ getCurrentScore token state =
             Http.request
                 { method = "GET"
                 , headers = [ Http.header "authenticationToken" token ]
-                , url = server ++ "getScore?state=" ++ jsonVal
+                , url =
+                    server
+                        ++ "getScore"
+                        ++ "?state="
+                        ++ Model.stateEncoder state
                 , body = Http.emptyBody
                 , expect = Http.expectJson getScoreDecoder
                 , timeout = Nothing
