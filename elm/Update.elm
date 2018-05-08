@@ -1,9 +1,11 @@
-module Update exposing (update, server)
+module Update exposing (init, update)
 
 import Http
 import Maybe exposing (withDefault)
 import Matrix
 import Model exposing (Model, Msg(..), GameState)
+import Navigation
+import UrlParser exposing ((<?>), stringParam)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -111,9 +113,42 @@ update msg model =
                 )
 
 
+init : Navigation.Location -> ( Model, Cmd Msg )
+init location =
+    let
+        --TODO how to get rid of "main.elm"
+        parser : UrlParser.Parser (Maybe String -> a) a
+        parser =
+            UrlParser.s "main.elm" <?> stringParam "password"
+
+        parsePassword =
+            UrlParser.parsePath parser >> withDefault Nothing >> withDefault "wrong"
+    in
+        ( Model.emptyModel
+        , initGame <| parsePassword location
+        )
+
+
 server : String
 server =
     "http://localhost:5000/"
+
+
+initGame : String -> Cmd Msg
+initGame pswrd =
+    let
+        request =
+            Http.request
+                { method = "GET"
+                , headers = [ Http.header "password" pswrd ]
+                , url = server ++ "initGame"
+                , body = Http.emptyBody
+                , expect = Http.expectJson Model.initGameDecoder
+                , timeout = Nothing
+                , withCredentials = False
+                }
+    in
+        Http.send InitGameResponse request
 
 
 getHint : String -> GameState -> Cmd Msg
