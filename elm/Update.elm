@@ -1,5 +1,6 @@
 module Update exposing (init, update)
 
+import Json.Decode as Decode
 import Http
 import Maybe exposing (withDefault)
 import Matrix
@@ -134,108 +135,109 @@ server =
     "http://localhost:5000/"
 
 
-initGame : String -> Cmd Msg
+type alias Password =
+    String
+
+
+type alias Token =
+    String
+
+
+getRequest : Maybe Password -> Maybe Token -> String -> Decode.Decoder a -> Http.Request a
+getRequest mpassword mtoken urlToCall decoder =
+    let
+        tryHeader key maybeValue =
+            Maybe.map (Http.header key >> List.singleton) maybeValue |> Maybe.withDefault []
+
+        passHeader =
+            tryHeader "password" mpassword
+
+        tokenHeader =
+            tryHeader "authenticationToken" mtoken
+
+        securityHeaders =
+            List.append passHeader tokenHeader
+    in
+        Http.request
+            { method = "GET"
+            , headers = securityHeaders
+            , url = server ++ urlToCall
+            , body = Http.emptyBody
+            , expect = Http.expectJson decoder
+            , timeout = Nothing
+            , withCredentials = False
+            }
+
+
+initGame : Password -> Cmd Msg
 initGame pswrd =
     let
+        url =
+            "initGame"
+
         request =
-            Http.request
-                { method = "GET"
-                , headers = [ Http.header "password" pswrd ]
-                , url = server ++ "initGame"
-                , body = Http.emptyBody
-                , expect = Http.expectJson Model.initGameDecoder
-                , timeout = Nothing
-                , withCredentials = False
-                }
+            getRequest (Just pswrd) Nothing url Model.initGameDecoder
     in
         Http.send InitGameResponse request
 
 
-getHint : String -> GameState -> Cmd Msg
+getHint : Token -> GameState -> Cmd Msg
 getHint token state =
     let
+        url =
+            "getHint"
+                ++ "?state="
+                ++ Model.stateEncoder state
+
         request =
-            Http.request
-                { method = "GET"
-                , headers = [ Http.header "authenticationToken" token ]
-                , url =
-                    server
-                        ++ "getHint"
-                        ++ "?state="
-                        ++ Model.stateEncoder state
-                , body = Http.emptyBody
-                , expect = Http.expectJson Model.hintDecoder
-                , timeout = Nothing
-                , withCredentials = False
-                }
+            getRequest Nothing (Just token) url Model.hintDecoder
     in
         Http.send GetHintResponse request
 
 
-makeMove : String -> GameState -> Matrix.Location -> Matrix.Location -> Cmd Msg
+makeMove : Token -> GameState -> Matrix.Location -> Matrix.Location -> Cmd Msg
 makeMove token state locFrom locTo =
     let
+        url =
+            "makeMove"
+                ++ "?state="
+                ++ Model.stateEncoder state
+                ++ "&from="
+                ++ Model.locationEncoder locFrom
+                ++ "&to="
+                ++ Model.locationEncoder locTo
+
         request =
-            Http.request
-                { method = "GET"
-                , headers = [ Http.header "authenticationToken" token ]
-                , url =
-                    server
-                        ++ "makeMove"
-                        ++ "?state="
-                        ++ Model.stateEncoder state
-                        ++ "&from="
-                        ++ Model.locationEncoder locFrom
-                        ++ "&to="
-                        ++ Model.locationEncoder locTo
-                , body = Http.emptyBody
-                , expect = Http.expectJson Model.gameStateDecoder
-                , timeout = Nothing
-                , withCredentials = False
-                }
+            getRequest Nothing (Just token) url Model.gameStateDecoder
     in
         Http.send MakeMoveResponse request
 
 
-getReachablePositions : String -> GameState -> Matrix.Location -> Cmd Msg
+getReachablePositions : Token -> GameState -> Matrix.Location -> Cmd Msg
 getReachablePositions token state location =
     let
+        url =
+            "getReachablePositions"
+                ++ "?state="
+                ++ Model.stateEncoder state
+                ++ "&location="
+                ++ Model.locationEncoder location
+
         request =
-            Http.request
-                { method = "GET"
-                , headers = [ Http.header "authenticationToken" token ]
-                , url =
-                    server
-                        ++ "getReachablePositions"
-                        ++ "?state="
-                        ++ Model.stateEncoder state
-                        ++ "&location="
-                        ++ Model.locationEncoder location
-                , body = Http.emptyBody
-                , expect = Http.expectJson Model.locationListDecoder
-                , timeout = Nothing
-                , withCredentials = False
-                }
+            getRequest Nothing (Just token) url Model.locationListDecoder
     in
         Http.send GetMovesResponse request
 
 
-getCurrentScore : String -> GameState -> Cmd Msg
+getCurrentScore : Token -> GameState -> Cmd Msg
 getCurrentScore token state =
     let
+        url =
+            "getScore"
+                ++ "?state="
+                ++ Model.stateEncoder state
+
         request =
-            Http.request
-                { method = "GET"
-                , headers = [ Http.header "authenticationToken" token ]
-                , url =
-                    server
-                        ++ "getScore"
-                        ++ "?state="
-                        ++ Model.stateEncoder state
-                , body = Http.emptyBody
-                , expect = Http.expectJson Model.scoreDecoder
-                , timeout = Nothing
-                , withCredentials = False
-                }
+            getRequest Nothing (Just token) url Model.scoreDecoder
     in
         Http.send GetScoreResponse request
