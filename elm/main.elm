@@ -14,7 +14,7 @@ main : Program Never Model Msg
 main =
     Navigation.program
         --TODO how to ignore
-        (\_ -> Dummy)
+        (always Dummy)
         { init = init
         , view = View.view Clicked GetHint GetScore Prev Next
         , update = Update.update
@@ -33,16 +33,7 @@ init location =
         parsePassword =
             UrlParser.parsePath parser >> withDefault Nothing >> withDefault "wrong"
     in
-        ( Model.Model
-            Model.emptyState
-            Nothing
-            Nothing
-            Nothing
-            []
-            []
-            ""
-            0
-            ""
+        ( Model.emptyModel
         , initGame <| parsePassword location
         )
 

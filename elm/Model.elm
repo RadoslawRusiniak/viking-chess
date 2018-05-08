@@ -7,6 +7,7 @@ module Model
         , Move
         , GameState
         , WhoMoves
+        , emptyModel
         , emptyState
         , isEmptyField
         , initGameDecoder
@@ -63,11 +64,25 @@ type alias Model =
     }
 
 
+emptyModel : Model
+emptyModel =
+    Model
+        emptyState
+        Nothing
+        Nothing
+        Nothing
+        []
+        []
+        ""
+        0
+        ""
+
+
 emptyState : GameState
 emptyState =
     let
         emptyBoard =
-            Matrix.square 2 (\_ -> Empty)
+            Matrix.square 2 (always Empty)
     in
         ( emptyBoard, 0 )
 
