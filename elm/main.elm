@@ -1,8 +1,5 @@
 module Main exposing (main)
 
-import Html exposing (Html, Attribute, button, div, text)
-import Html.Attributes exposing (style)
-import Html.Events exposing (onClick)
 import Maybe exposing (withDefault)
 import Http
 import Matrix
@@ -10,6 +7,7 @@ import Navigation as Nav exposing (program, Location)
 import UrlParser exposing (Parser, top, s, (<?>), stringParam, parsePath)
 import Model exposing (Msg(..), Model, GameState, Board, Field(..), Move, WhoMoves)
 import View
+import Subscriptions
 
 
 main : Program Never Model Msg
@@ -20,13 +18,8 @@ main =
         { init = init
         , view = View.view Clicked GetHint GetScore Prev Next
         , update = update
-        , subscriptions = subscriptions
+        , subscriptions = Subscriptions.subscriptions
         }
-
-
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
 
 
 init : Nav.Location -> ( Model, Cmd Msg )
