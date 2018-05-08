@@ -168,6 +168,7 @@ update msg model =
                     , historyNext = []
                   }
                 , Cmd.none
+
                 )
 
             GetHint ->
@@ -429,3 +430,19 @@ pawnStyle f =
             , ( "position", "absolute" )
             , ( "-webkit-border-radius", "44px" )
             ]
+
+representationColor : Field -> String
+representationColor f =
+    case f of
+        Empty ->
+            "peru"
+
+        Defender ->
+            "white"
+
+        Attacker ->
+            "grey"
+
+        King ->
+            "purple"
+            

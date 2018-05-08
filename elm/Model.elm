@@ -2,7 +2,7 @@ module Model
     exposing
         ( Model
         , Board
-        , Field
+        , Field (..)
         , Move
         , GameState
         , WhoMoves
@@ -178,23 +178,3 @@ stateEncoder ( b, who ) =
             Encode.int
     in
         Encode.object [ ( "board", boardToJsonValue b ), ( "whoMoves", whoToJsonValue who ) ] |> Encode.encode 0
-
-
-
---TODO probably This shouldn't be in model
-
-
-representationColor : Field -> String
-representationColor f =
-    case f of
-        Empty ->
-            "peru"
-
-        Defender ->
-            "white"
-
-        Attacker ->
-            "grey"
-
-        King ->
-            "purple"
