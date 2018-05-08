@@ -1,8 +1,9 @@
 module Model
     exposing
-        ( Model
+        ( Msg(..)
+        , Model
         , Board
-        , Field (..)
+        , Field(..)
         , Move
         , GameState
         , WhoMoves
@@ -13,9 +14,9 @@ module Model
         , locationDecoder
         , locationEncoder
         , stateEncoder
-        , representationColor
         )
 
+import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Maybe exposing (withDefault)
@@ -73,6 +74,24 @@ isEmptyField =
     (==) Empty
 
 
+type alias HttpRes a =
+    Result Http.Error a
+
+
+type Msg
+    = Dummy
+    | InitGameResponse (HttpRes ( String, GameState ))
+    | Clicked Matrix.Location
+    | Next
+    | Prev
+    | GetScore
+    | GetScoreResponse (HttpRes Float)
+    | GetMovesResponse (HttpRes (List Matrix.Location))
+    | MakeMoveResponse (HttpRes GameState)
+    | GetHint
+    | GetHintResponse (HttpRes Move)
+
+
 locationDecoder : Decode.Decoder Matrix.Location
 locationDecoder =
     Decode.map2 Matrix.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
@@ -101,11 +120,18 @@ gameStateDecoder =
         decodeFields : Decode.Decoder (List (List Field))
         decodeFields =
             let
-                toFields = List.map charToField
+                toFields =
+                    List.map charToField
+
                 --TODO pass board size and read it here
-                boardLen = 11
-                toRows = chunksOfLeft boardLen
-                stringTo2DFields = String.toList >> toFields >> toRows
+                boardLen =
+                    11
+
+                toRows =
+                    chunksOfLeft boardLen
+
+                stringTo2DFields =
+                    String.toList >> toFields >> toRows
             in
                 Decode.string |> Decode.andThen (stringTo2DFields >> Decode.succeed)
 

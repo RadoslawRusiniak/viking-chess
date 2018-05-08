@@ -5,12 +5,11 @@ import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Maybe exposing (withDefault)
 import Json.Decode as Decode
-import Json.Encode as Encode
 import Http
 import Matrix as Mtrx exposing (Matrix, square, toList, Location, row, col)
 import Navigation as Nav exposing (program, Location)
 import UrlParser exposing (Parser, top, s, (<?>), stringParam, parsePath)
-import Model exposing (Model, GameState, Board, Field, Move, WhoMoves)
+import Model exposing (Msg(..), Model, GameState, Board, Field(..), Move, WhoMoves)
 
 
 main : Program Never Model Msg
@@ -53,24 +52,6 @@ init location =
             ""
         , initGame <| parsePassword location
         )
-
-
-type alias HttpRes a =
-    Result Http.Error a
-
-
-type Msg
-    = Dummy
-    | InitGameResponse (HttpRes ( String, GameState ))
-    | Clicked Mtrx.Location
-    | Next
-    | Prev
-    | GetScore
-    | GetScoreResponse (HttpRes Float)
-    | GetMovesResponse (HttpRes (List Mtrx.Location))
-    | MakeMoveResponse (HttpRes GameState)
-    | GetHint
-    | GetHintResponse (HttpRes Move)
 
 
 
@@ -168,7 +149,6 @@ update msg model =
                     , historyNext = []
                   }
                 , Cmd.none
-
                 )
 
             GetHint ->
@@ -417,11 +397,22 @@ fieldStyle highlighted clicked hint =
 pawnStyle : Field -> Attribute Msg
 pawnStyle f =
     let
-        background =
-            Model.representationColor f
+        representationColor f =
+            case f of
+                Empty ->
+                    "peru"
+
+                Defender ->
+                    "white"
+
+                Attacker ->
+                    "grey"
+
+                King ->
+                    "purple"
     in
         style
-            [ ( "backgroundColor", background )
+            [ ( "backgroundColor", representationColor f )
             , ( "height", "44px" )
             , ( "width", "44px" )
             , ( "margin-left", "3px" )
@@ -430,19 +421,3 @@ pawnStyle f =
             , ( "position", "absolute" )
             , ( "-webkit-border-radius", "44px" )
             ]
-
-representationColor : Field -> String
-representationColor f =
-    case f of
-        Empty ->
-            "peru"
-
-        Defender ->
-            "white"
-
-        Attacker ->
-            "grey"
-
-        King ->
-            "purple"
-            
