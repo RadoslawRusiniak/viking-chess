@@ -4,9 +4,8 @@ import Html exposing (Html, Attribute, button, div, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Maybe exposing (withDefault)
-import Json.Decode as Decode
 import Http
-import Matrix as Mtrx exposing (Matrix, square, toList, Location, row, col)
+import Matrix
 import Navigation as Nav exposing (program, Location)
 import UrlParser exposing (Parser, top, s, (<?>), stringParam, parsePath)
 import Model exposing (Msg(..), Model, GameState, Board, Field(..), Move, WhoMoves)
@@ -84,7 +83,7 @@ update msg model =
                 , historyNext = m.state :: m.historyNext
             }
 
-        handleClick : Model -> Mtrx.Location -> ( Model, Cmd Msg )
+        handleClick : Model -> Matrix.Location -> ( Model, Cmd Msg )
         handleClick model location =
             case model.clickedLocation of
                 Nothing ->
@@ -188,13 +187,6 @@ initGame pswrd =
 getHint : String -> GameState -> Cmd Msg
 getHint token state =
     let
-        moveDecoder : Decode.Decoder Move
-        moveDecoder =
-            Decode.map2 (,) (Decode.field "from" Model.locationDecoder) (Decode.field "to" Model.locationDecoder)
-
-        hintDecoder =
-            Decode.field "hint" moveDecoder
-
         request =
             Http.request
                 { method = "GET"
@@ -205,7 +197,7 @@ getHint token state =
                         ++ "?state="
                         ++ Model.stateEncoder state
                 , body = Http.emptyBody
-                , expect = Http.expectJson hintDecoder
+                , expect = Http.expectJson Model.hintDecoder
                 , timeout = Nothing
                 , withCredentials = False
                 }
@@ -213,7 +205,7 @@ getHint token state =
         Http.send GetHintResponse request
 
 
-makeMove : String -> GameState -> Mtrx.Location -> Mtrx.Location -> Cmd Msg
+makeMove : String -> GameState -> Matrix.Location -> Matrix.Location -> Cmd Msg
 makeMove token state locFrom locTo =
     let
         request =
@@ -238,13 +230,9 @@ makeMove token state locFrom locTo =
         Http.send MakeMoveResponse request
 
 
-getReachablePositions : String -> GameState -> Mtrx.Location -> Cmd Msg
+getReachablePositions : String -> GameState -> Matrix.Location -> Cmd Msg
 getReachablePositions token state location =
     let
-        listOfMovesDecoder : Decode.Decoder (List Mtrx.Location)
-        listOfMovesDecoder =
-            Decode.field "positions" (Decode.list Model.locationDecoder)
-
         request =
             Http.request
                 { method = "GET"
@@ -257,7 +245,7 @@ getReachablePositions token state location =
                         ++ "&location="
                         ++ Model.locationEncoder location
                 , body = Http.emptyBody
-                , expect = Http.expectJson listOfMovesDecoder
+                , expect = Http.expectJson Model.locationListDecoder
                 , timeout = Nothing
                 , withCredentials = False
                 }
@@ -268,10 +256,6 @@ getReachablePositions token state location =
 getCurrentScore : String -> GameState -> Cmd Msg
 getCurrentScore token state =
     let
-        getScoreDecoder : Decode.Decoder Float
-        getScoreDecoder =
-            Decode.field "score" Decode.float
-
         request =
             Http.request
                 { method = "GET"
@@ -282,7 +266,7 @@ getCurrentScore token state =
                         ++ "?state="
                         ++ Model.stateEncoder state
                 , body = Http.emptyBody
-                , expect = Http.expectJson getScoreDecoder
+                , expect = Http.expectJson Model.scoreDecoder
                 , timeout = Nothing
                 , withCredentials = False
                 }
@@ -335,8 +319,8 @@ view model =
             [ div []
                 (model.state
                     |> Tuple.first
-                    |> Mtrx.mapWithLocation (\loc elem -> div [ getFieldStyle loc, onClick (Clicked loc) ] [ setPawn elem ])
-                    |> Mtrx.toList
+                    |> Matrix.mapWithLocation (\loc elem -> div [ getFieldStyle loc, onClick (Clicked loc) ] [ setPawn elem ])
+                    |> Matrix.toList
                     |> List.map (div [ style [ ( "height", "56px" ) ] ])
                 )
             , div []

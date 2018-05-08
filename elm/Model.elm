@@ -12,6 +12,9 @@ module Model
         , initGameDecoder
         , gameStateDecoder
         , locationDecoder
+        , locationListDecoder
+        , hintDecoder
+        , scoreDecoder
         , locationEncoder
         , stateEncoder
         )
@@ -97,6 +100,21 @@ locationDecoder =
     Decode.map2 Matrix.loc (Decode.field "row" Decode.int) (Decode.field "column" Decode.int)
 
 
+moveDecoder : Decode.Decoder Move
+moveDecoder =
+    Decode.map2 (,) (Decode.field "from" locationDecoder) (Decode.field "to" locationDecoder)
+
+
+locationListDecoder : Decode.Decoder (List Matrix.Location)
+locationListDecoder =
+    Decode.field "positions" (Decode.list locationDecoder)
+
+
+hintDecoder : Decode.Decoder Move
+hintDecoder =
+    Decode.field "hint" moveDecoder
+
+
 gameStateDecoder : Decode.Decoder GameState
 gameStateDecoder =
     let
@@ -155,6 +173,11 @@ initGameDecoder =
             Decode.field "token" Decode.string
     in
         Decode.map2 (,) tokenDecoder gameStateDecoder
+
+
+scoreDecoder : Decode.Decoder Float
+scoreDecoder =
+    Decode.field "score" Decode.float
 
 
 locationEncoder : Matrix.Location -> String
