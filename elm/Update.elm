@@ -1,6 +1,7 @@
 module Update exposing (init, update)
 
 import Json.Decode as Decode
+import Json.Encode as Encode
 import Http
 import Maybe exposing (withDefault)
 import Matrix
@@ -139,8 +140,8 @@ type alias Password =
     String
 
 
-getRequest : Maybe Password -> Maybe Token -> String -> Decode.Decoder a -> Http.Request a
-getRequest mpassword mtoken urlToCall decoder =
+getRequest : Maybe Password -> Maybe Token -> String -> Maybe Encode.Value -> Decode.Decoder a -> Http.Request a
+getRequest mpassword mtoken urlToCall encodedVal decoder =
     let
         tryHeader key maybeValue =
             Maybe.map (Http.header key >> List.singleton) maybeValue |> Maybe.withDefault []
@@ -155,10 +156,10 @@ getRequest mpassword mtoken urlToCall decoder =
             List.append passHeader tokenHeader
     in
         Http.request
-            { method = "GET"
+            { method = "POST"
             , headers = securityHeaders
             , url = server ++ urlToCall
-            , body = Http.emptyBody
+            , body = Maybe.map Http.jsonBody encodedVal |> Maybe.withDefault Http.emptyBody
             , expect = Http.expectJson decoder
             , timeout = Nothing
             , withCredentials = False
@@ -172,7 +173,7 @@ initGame pswrd =
             "initGame"
 
         request =
-            getRequest (Just pswrd) Nothing url Model.initGameDecoder
+            getRequest (Just pswrd) Nothing url Nothing Model.initGameDecoder
     in
         Http.send InitGameResponse request
 
@@ -182,11 +183,12 @@ getHint token state =
     let
         url =
             "getHint"
-                ++ "?state="
-                ++ Model.stateEncoder state
+
+        encoder =
+            Encode.object [("state", Model.stateEncoder state)]
 
         request =
-            getRequest Nothing (Just token) url Model.hintDecoder
+            getRequest Nothing (Just token) url (Just encoder) Model.hintDecoder
     in
         Http.send GetHintResponse request
 
@@ -196,15 +198,12 @@ makeMove token state locFrom locTo boardSize =
     let
         url =
             "makeMove"
-                ++ "?state="
-                ++ Model.stateEncoder state
-                ++ "&from="
-                ++ Model.locationEncoder locFrom
-                ++ "&to="
-                ++ Model.locationEncoder locTo
+
+        encoder =
+            Encode.object [("state", Model.stateEncoder state), ("from", Model.locationEncoder locFrom), ("to", Model.locationEncoder locTo)]
 
         request =
-            getRequest Nothing (Just token) url (Model.gameStateDecoder boardSize)
+            getRequest Nothing (Just token) url (Just encoder) (Model.gameStateDecoder boardSize)
     in
         Http.send MakeMoveResponse request
 
@@ -214,13 +213,12 @@ getReachablePositions token state location =
     let
         url =
             "getReachablePositions"
-                ++ "?state="
-                ++ Model.stateEncoder state
-                ++ "&location="
-                ++ Model.locationEncoder location
+
+        encoder =
+            Encode.object [("state", Model.stateEncoder state), ("location", Model.locationEncoder location)]
 
         request =
-            getRequest Nothing (Just token) url Model.locationListDecoder
+            getRequest Nothing (Just token) url (Just encoder) Model.locationListDecoder
     in
         Http.send GetMovesResponse request
 
@@ -230,10 +228,11 @@ getCurrentScore token state =
     let
         url =
             "getScore"
-                ++ "?state="
-                ++ Model.stateEncoder state
+        
+        encoder =
+            Encode.object [("state", Model.stateEncoder state)]
 
         request =
-            getRequest Nothing (Just token) url Model.scoreDecoder
+            getRequest Nothing (Just token) url (Just encoder) Model.scoreDecoder
     in
         Http.send GetScoreResponse request

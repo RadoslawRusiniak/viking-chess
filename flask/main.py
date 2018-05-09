@@ -36,11 +36,13 @@ def isCorrectRequest(hdrs):
     return requestToken == generatedToken
 
 def parseCoordinates(data):
-    parsed = json.loads(data)
-    row, col = parsed["location"]["row"], parsed["location"]["column"]
+    row, col = data["location"]["row"], data["location"]["column"]
     return Coordinates(row, col)
 
-@app.route('/initGame', methods=['GET'])
+def setupPosition(data):
+    e.setup_position(data["board"], data["whoMoves"])
+
+@app.route('/initGame', methods=['GET','POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def initGame():
     if (not isCorrectPassword(request.headers)):
@@ -57,25 +59,28 @@ def initGame():
     })
 
 
-@app.route('/getScore', methods=['GET'])
+@app.route('/getScore', methods=['GET','POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getScore():
     if (not isCorrectRequest(request.headers)):
         return None #TODO some error here
+
+    setupPosition(request.json['state'])
 
     return jsonify(
     {
         "score": 3
     })
 
-@app.route('/getReachablePositions', methods=['GET'])
+@app.route('/getReachablePositions', methods=['GET','POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getReachablePositions():
     if (not isCorrectRequest(request.headers)):
         return None #TODO some error here
 
-    gameLoc = parseCoordinates(request.args["location"])
+    setupPosition(request.json["state"])
 
+    gameLoc = parseCoordinates(request.json["location"])
     positions = e.board.get_reachable_from_position(gameLoc)
 
     jsonPositions = []
@@ -91,15 +96,16 @@ def getReachablePositions():
         "positions": jsonPositions
     })
 
-@app.route('/makeMove', methods=['GET'])
+@app.route('/makeMove', methods=['GET', 'POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def makeMove():
     if (not isCorrectRequest(request.headers)):
         return None #TODO some error here
 
-    locFrom = parseCoordinates(request.args["from"])
-    locTo = parseCoordinates(request.args["to"])
+    setupPosition(request.json["state"])
 
+    locFrom = parseCoordinates(request.json["from"])
+    locTo = parseCoordinates(request.json["to"])
     e.make_move(Move(locFrom, locTo).to_string())
     
     return jsonify(
@@ -108,11 +114,13 @@ def makeMove():
         "whoMoves": e.current_side
     })
 
-@app.route('/getHint', methods=['GET'])
+@app.route('/getHint', methods=['GET', 'POST'])
 @cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
 def getHint():
     if (not isCorrectRequest(request.headers)):
         return None #TODO some error here
+
+    setupPosition(request.json["state"])
 
     hint = e.go()
 

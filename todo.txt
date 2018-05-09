@@ -1,8 +1,6 @@
 
 display corners and throne in other way than the rest of the fields
 
-use engine's setupposition and pass board from json
-
 introduce concept of player and connect it to pawns
   => check if clicked pawn is a pawn of a player to move, if not ignore click
 
@@ -11,8 +9,6 @@ setup position feature
 remove "Dummy" Msg if possible
 
 change wording - whomoves -> who's turn in jsons and code
-
-maybe: pass all json in body of post requests
 
 create separate model file for gamestate, history, (maybe also move or location) etc. with decoders/encoders
 
