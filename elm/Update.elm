@@ -46,7 +46,7 @@ update msg model =
                 Just from ->
                     case List.member location (model.possibleMoves |> withDefault []) of
                         True ->
-                            ( { model | clickedLocation = Nothing }, makeMove model.token model.state from location )
+                            ( { model | clickedLocation = Nothing }, makeMove model.token model.state from location model.boardSize )
 
                         False ->
                             ( { model | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none )
@@ -58,8 +58,8 @@ update msg model =
             InitGameResponse (Err e) ->
                 handleErr e
 
-            InitGameResponse (Ok ( t, s )) ->
-                ( { model | token = t, state = s }, Cmd.none )
+            InitGameResponse (Ok ( t, s, boardSize )) ->
+                ( { model | token = t, state = s, boardSize = boardSize }, Cmd.none )
 
             Clicked location ->
                 handleClick model location
@@ -191,8 +191,8 @@ getHint token state =
         Http.send GetHintResponse request
 
 
-makeMove : Token -> GameState -> Matrix.Location -> Matrix.Location -> Cmd Msg
-makeMove token state locFrom locTo =
+makeMove : Token -> GameState -> Matrix.Location -> Matrix.Location -> Int -> Cmd Msg
+makeMove token state locFrom locTo boardSize =
     let
         url =
             "makeMove"
@@ -204,7 +204,7 @@ makeMove token state locFrom locTo =
                 ++ Model.locationEncoder locTo
 
         request =
-            getRequest Nothing (Just token) url Model.gameStateDecoder
+            getRequest Nothing (Just token) url (Model.gameStateDecoder boardSize)
     in
         Http.send MakeMoveResponse request
 

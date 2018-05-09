@@ -58,6 +58,7 @@ type alias Token =
 
 type alias Model =
     { state : GameState
+    , boardSize : Int
     , clickedLocation : Maybe Matrix.Location
     , possibleMoves : Maybe (List Matrix.Location)
     , hint : Maybe Move
@@ -73,6 +74,7 @@ emptyModel : Model
 emptyModel =
     Model
         emptyState
+        0
         Nothing
         Nothing
         Nothing
@@ -103,7 +105,7 @@ type alias HttpRes a =
 
 type Msg
     = Dummy
-    | InitGameResponse (HttpRes ( Token, GameState ))
+    | InitGameResponse (HttpRes ( Token, GameState, Int ))
     | Clicked Matrix.Location
     | Next
     | Prev
@@ -135,8 +137,8 @@ hintDecoder =
     Decode.field "hint" moveDecoder
 
 
-gameStateDecoder : Decode.Decoder GameState
-gameStateDecoder =
+gameStateDecoder : Int -> Decode.Decoder GameState
+gameStateDecoder boardSize =
     let
         charToField c =
             case c of
@@ -161,12 +163,8 @@ gameStateDecoder =
                 toFields =
                     List.map charToField
 
-                --TODO pass board size and read it here
-                boardLen =
-                    11
-
                 toRows =
-                    chunksOfLeft boardLen
+                    chunksOfLeft boardSize
 
                 stringTo2DFields =
                     String.toList >> toFields >> toRows
@@ -186,13 +184,28 @@ gameStateDecoder =
         Decode.map2 (,) decodeFieldBoard decodeFieldWhoMoves
 
 
-initGameDecoder : Decode.Decoder ( Token, GameState )
+initGameDecoder : Decode.Decoder ( Token, GameState, Int )
 initGameDecoder =
     let
         tokenDecoder =
             Decode.field "token" Decode.string
+
+        boardSizeDecoder =
+            Decode.field "boardSize" Decode.int
+
+        initDecoder : Int -> Decode.Decoder ( Token, GameState )
+        initDecoder boardSize =
+            Decode.map2 (,) tokenDecoder (gameStateDecoder boardSize)
+
+        appendSize : Int -> ( Token, GameState ) -> Decode.Decoder ( Token, GameState, Int )
+        appendSize boardSize ( t, st ) =
+            ( t, st, boardSize ) |> Decode.succeed
+
+        finalDecoder : Int -> Decode.Decoder ( Token, GameState, Int )
+        finalDecoder boardSize =
+            Decode.andThen (appendSize boardSize) (initDecoder boardSize)
     in
-        Decode.map2 (,) tokenDecoder gameStateDecoder
+        boardSizeDecoder |> Decode.andThen finalDecoder
 
 
 scoreDecoder : Decode.Decoder Float

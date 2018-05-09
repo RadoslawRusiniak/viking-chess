@@ -52,7 +52,8 @@ def initGame():
     {
         "token": generatedToken,
         "board": e.board.to_string(),
-        "whoMoves": e.current_side
+        "whoMoves": e.current_side,
+        "boardSize": e.board.BOARD_SIZE
     })
 
 
