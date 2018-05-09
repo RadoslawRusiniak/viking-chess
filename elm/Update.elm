@@ -4,7 +4,7 @@ import Json.Decode as Decode
 import Http
 import Maybe exposing (withDefault)
 import Matrix
-import Model exposing (Model, Msg(..), GameState)
+import Model exposing (Model, Msg(..), GameState, Token)
 import Navigation
 import UrlParser exposing ((<?>), stringParam)
 
@@ -136,10 +136,6 @@ server =
 
 
 type alias Password =
-    String
-
-
-type alias Token =
     String
 
 

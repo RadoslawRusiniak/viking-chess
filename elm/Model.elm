@@ -7,6 +7,7 @@ module Model
         , Move
         , GameState
         , WhoMoves
+        , Token
         , emptyModel
         , emptyState
         , isEmptyField
@@ -51,6 +52,10 @@ type alias Move =
     ( Matrix.Location, Matrix.Location )
 
 
+type alias Token =
+    String
+
+
 type alias Model =
     { state : GameState
     , clickedLocation : Maybe Matrix.Location
@@ -60,7 +65,7 @@ type alias Model =
     , historyNext : List GameState
     , errorText : String
     , currentScore : Float
-    , token : String
+    , token : Token
     }
 
 
@@ -98,7 +103,7 @@ type alias HttpRes a =
 
 type Msg
     = Dummy
-    | InitGameResponse (HttpRes ( String, GameState ))
+    | InitGameResponse (HttpRes ( Token, GameState ))
     | Clicked Matrix.Location
     | Next
     | Prev
@@ -181,7 +186,7 @@ gameStateDecoder =
         Decode.map2 (,) decodeFieldBoard decodeFieldWhoMoves
 
 
-initGameDecoder : Decode.Decoder ( String, GameState )
+initGameDecoder : Decode.Decoder ( Token, GameState )
 initGameDecoder =
     let
         tokenDecoder =
