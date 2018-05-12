@@ -1,6 +1,7 @@
 module Main exposing (main)
 
-import Model exposing (Msg(..), Model)
+import Messages exposing (Msg(..))
+import Model exposing (Model)
 import Navigation
 import Subscriptions
 import Update

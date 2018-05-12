@@ -4,7 +4,8 @@ import Html exposing (Html, Attribute, button, div, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Matrix
-import Model exposing (Model, Mode(..), Pawn(..), Msg)
+import Messages exposing (Msg)
+import Model exposing (Model, Mode(..), Pawn(..))
 
 
 type alias OnFieldClicked =

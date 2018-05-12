@@ -1,7 +1,6 @@
 module Model
     exposing
-        ( Msg(..)
-        , Model
+        ( Model
         , Mode(..)
         , Positioning
         , Pawn(..)
@@ -21,7 +20,6 @@ module Model
         , stateEncoder
         )
 
-import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Maybe exposing (withDefault)
@@ -94,28 +92,6 @@ emptyModel =
 emptyState : GameState
 emptyState =
     ( Matrix.square 11 (always Nothing), 0 )
-
-
-type alias HttpRes a =
-    Result Http.Error a
-
-
-type Msg
-    = Dummy
-    | InitGameResponse (HttpRes ( Token, GameState, Int ))
-    | Clicked Matrix.Location
-    | Next
-    | Prev
-    | GetScore
-    | GetScoreResponse (HttpRes Float)
-    | GetMovesResponse (HttpRes (List Matrix.Location))
-    | MakeMoveResponse (HttpRes GameState)
-    | GetHint
-    | GetHintResponse (HttpRes Move)
-    | ChangeSide
-    | EditPosition
-    | FinishEditing
-    | UpdateStateResponse (HttpRes ())
 
 
 locationDecoder : Decode.Decoder Matrix.Location

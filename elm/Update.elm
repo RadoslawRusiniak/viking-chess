@@ -5,7 +5,8 @@ import Json.Encode as Encode
 import Http
 import Maybe exposing (withDefault)
 import Matrix
-import Model exposing (Model, Msg(..), Pawn(..), GameState, Token)
+import Messages exposing (Msg(..))
+import Model exposing (Model, Pawn(..), GameState, Token)
 import Navigation
 import UrlParser exposing ((<?>), stringParam)
 
