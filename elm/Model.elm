@@ -7,6 +7,8 @@ module Model
         , Move
         , GameState
         , WhoMoves
+        , toString
+        , otherSide
         , Token
         , emptyModel
         , emptyState
@@ -32,8 +34,29 @@ type Mode
     | Edit
 
 
-type alias WhoMoves =
-    Int
+type WhoMoves
+    = WAttacker
+    | WDefender
+
+
+toString : WhoMoves -> String
+toString who =
+    case who of
+        WAttacker ->
+            "Attacker"
+
+        WDefender ->
+            "Defender"
+
+
+otherSide : WhoMoves -> WhoMoves
+otherSide who =
+    case who of
+        WAttacker ->
+            WDefender
+
+        WDefender ->
+            WAttacker
 
 
 type Pawn
@@ -91,7 +114,7 @@ emptyModel =
 
 emptyState : GameState
 emptyState =
-    ( Matrix.square 11 (always Nothing), 0 )
+    ( Matrix.square 11 (always Nothing), WAttacker )
 
 
 locationDecoder : Decode.Decoder Matrix.Location
@@ -152,8 +175,20 @@ gameStateDecoder boardSize =
         decodeFieldPositioning =
             Decode.field "board" decodePositioning
 
+        intToWhosTurn x =
+            case x of
+                0 ->
+                    WAttacker
+
+                1 ->
+                    WDefender
+
+                --TODO use never somehow
+                _ ->
+                    WAttacker
+
         decodeFieldWhoMoves =
-            Decode.field "whoMoves" Decode.int
+            Decode.field "whoMoves" Decode.int |> Decode.andThen (intToWhosTurn >> Decode.succeed)
     in
         Decode.map2 (,) decodeFieldPositioning decodeFieldWhoMoves
 
@@ -226,7 +261,15 @@ stateEncoder ( b, who ) =
         positionsToJsonValue =
             Matrix.toList >> List.concat >> List.map pawnToChar >> String.fromList >> Encode.string
 
+        whosTurnToInt side =
+            case side of
+                WAttacker ->
+                    0
+
+                WDefender ->
+                    1
+
         whoToJsonValue =
-            Encode.int
+            whosTurnToInt >> Encode.int
     in
         Encode.object [ ( "board", positionsToJsonValue b ), ( "whoMoves", whoToJsonValue who ) ]

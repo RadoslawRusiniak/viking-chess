@@ -77,10 +77,10 @@ update msg model =
                 updatePawns location =
                     Matrix.update location rotatePawn
 
-                updatePositioning ( pos, whoMoves ) location =
-                    ( updatePawns location pos, whoMoves )
+                updatePositioning location =
+                    Tuple.mapFirst (updatePawns location)
             in
-                ( { model | state = updatePositioning model.state location }, Cmd.none )
+                ( { model | state = updatePositioning location model.state }, Cmd.none )
     in
         case msg of
             Dummy ->
@@ -150,7 +150,7 @@ update msg model =
             ChangeSide ->
                 let
                     newstate =
-                        ( Tuple.first model.state, 1 - Tuple.second model.state )
+                        Tuple.mapSecond Model.otherSide model.state
                 in
                     ( { model | state = newstate }, updateState model.token newstate )
 

@@ -5,7 +5,7 @@ import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Matrix
 import Messages exposing (Msg)
-import Model exposing (Model, Mode(..), Pawn(..))
+import Model exposing (Model, Mode(..), Pawn(..), GameState, WhoMoves)
 
 
 type alias OnFieldClicked =
@@ -50,25 +50,51 @@ view onFieldClicked onGetHint onGetScore onPrev onNext onSideChange onEdit onFin
 
 displayOptionsPanel : OnGetHint -> OnGetScore -> OnPrev -> OnNext -> OnSideChange -> OnEdit -> OnFinishEdit -> Model -> Html Msg
 displayOptionsPanel onGetHint onGetScore onPrev onNext onSideChange onEdit onFinishEdit model =
-    let
-        isEditing =
-            model.mode == Edit
+    div [ style [ ( "display", "flex" ), ( "flex-direction", "column" ), ( "width", "180px" ), ( "margin-left", "40px" ), ( "justify-content", "space-around" ) ] ]
+        [ displayWhosTurnPanel onSideChange (Tuple.second model.state)
+        , Html.button [ onClick onGetHint ] [ text ("Get hint") ]
+        , displayHistoryPanel onPrev onNext model.historyPrev model.historyNext
+        , displayScorePanel onGetScore model.currentScore
+        , displayEditPanel onEdit onFinishEdit model.mode
+        , div [ errStyle ] [ text model.errorText ]
+        ]
 
-        isPlaying =
-            model.mode == Game
-    in
-        div [ style [ ( "display", "flex" ), ( "flex-direction", "column" ), ( "justify-content", "space-around" ) ] ]
-            [ Html.text ("Now moves: " ++ toString (Tuple.second model.state))
-            , Html.button [ onClick onSideChange ] [ text ("Change side") ]
-            , Html.button [ onClick onGetHint ] [ text ("Get hint") ]
-            , Html.button [ onClick onPrev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
-            , Html.button [ onClick onNext, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
-            , Html.button [ onClick onGetScore ] [ text ("Get score") ]
-            , Html.text (toString model.currentScore)
-            , Html.button [ onClick onEdit, Html.Attributes.disabled isEditing ] [ text ("Edit") ]
-            , Html.button [ onClick onFinishEdit, Html.Attributes.disabled isPlaying ] [ text ("Finish edit") ]
-            , div [ errStyle ] [ text model.errorText ]
-            ]
+
+displayWhosTurnPanel : OnSideChange -> WhoMoves -> Html Msg
+displayWhosTurnPanel onSideChange whosTurn =
+    div [ panelStyle ]
+        [ Html.text ("Now moves: " ++ Model.toString whosTurn)
+        , Html.button [ onClick onSideChange ] [ text ("Change side") ]
+        ]
+
+
+displayHistoryPanel : OnPrev -> OnNext -> List GameState -> List GameState -> Html Msg
+displayHistoryPanel onPrev onNext historyPrev historyNext =
+    div [ panelStyle ]
+        [ Html.button [ onClick onPrev, Html.Attributes.disabled (List.isEmpty historyPrev) ] [ text "history prev" ]
+        , Html.button [ onClick onNext, Html.Attributes.disabled (List.isEmpty historyNext) ] [ text "history next" ]
+        ]
+
+
+displayScorePanel : OnGetScore -> Float -> Html Msg
+displayScorePanel onGetScore currentScore =
+    div [ panelStyle ]
+        [ Html.button [ onClick onGetScore ] [ text ("Get score") ]
+        , Html.text (toString currentScore)
+        ]
+
+
+displayEditPanel : OnEdit -> OnFinishEdit -> Mode -> Html Msg
+displayEditPanel onEdit onFinishEdit mode =
+    div [ panelStyle ]
+        [ Html.button [ onClick onEdit, Html.Attributes.disabled (mode == Edit) ] [ text ("Edit") ]
+        , Html.button [ onClick onFinishEdit, Html.Attributes.disabled (mode == Game) ] [ text ("Finish edit") ]
+        ]
+
+
+panelStyle : Attribute Msg
+panelStyle =
+    style [ ( "display", "flex" ), ( "flex-direction", "row" ), ( "justify-content", "space-between" ) ]
 
 
 displayBoardWithPawns : OnFieldClicked -> Model -> Html.Html Msg
