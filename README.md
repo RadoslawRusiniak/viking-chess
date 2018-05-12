@@ -10,6 +10,7 @@ Why?
 
 
 Prerequisites:
+
 0. Knowing authentication token. For now it's secret for me and someone somewhere. Without it server will not respond.
 
 1. Elm lang. https://guide.elm-lang.org/install.html

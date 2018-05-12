@@ -41,9 +41,24 @@ update msg model =
         handleGameClick model location =
             case model.clickedLocation of
                 Nothing ->
-                    ( { model | clickedLocation = Just location }
-                    , getReachablePositions model.token model.state location
-                    )
+                    let
+                        whosTurn =
+                            Tuple.second model.state
+
+                        mpawn =
+                            Tuple.first model.state |> Matrix.get location |> Maybe.withDefault Nothing
+
+                        sameSide =
+                            Maybe.map (Model.isSameSide whosTurn) mpawn |> Maybe.withDefault False
+                    in
+                        if sameSide then
+                            ( { model | clickedLocation = Just location }
+                            , getReachablePositions model.token model.state location
+                            )
+                        else
+                            ( { model | clickedLocation = Just location }
+                            , Cmd.none
+                            )
 
                 Just from ->
                     case List.member location (model.possibleMoves |> withDefault []) of

@@ -9,6 +9,7 @@ module Model
         , WhoMoves
         , toString
         , otherSide
+        , isSameSide
         , Token
         , emptyModel
         , emptyState
@@ -63,6 +64,11 @@ type Pawn
     = Attacker
     | Defender
     | King
+
+
+isSameSide : WhoMoves -> Pawn -> Bool
+isSameSide whosTurn pawn =
+    (whosTurn == WAttacker && pawn == Attacker) || (whosTurn == WDefender && (pawn == Defender || pawn == King))
 
 
 type alias Positioning =
