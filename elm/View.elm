@@ -4,7 +4,7 @@ import Html exposing (Html, Attribute, button, div, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Matrix
-import Model exposing (Model, Msg, Field(..))
+import Model exposing (Model, Pawn(..), Msg)
 
 
 type alias OnFieldClicked =
@@ -29,6 +29,28 @@ type alias OnNext =
 
 view : OnFieldClicked -> OnGetHint -> OnGetScore -> OnPrev -> OnNext -> Model -> Html Msg
 view onFieldClicked onGetHint onGetScore onPrev onNext model =
+    div [ style [ ( "display", "flex" ), ( "flex-direction", "row" ) ] ]
+        [ displayBoardWithPawns onFieldClicked model
+        , displayOptionsPanel onGetHint onGetScore onPrev onNext model
+        ]
+
+
+displayOptionsPanel : OnGetHint -> OnGetScore -> OnPrev -> OnNext -> Model -> Html Msg
+displayOptionsPanel onGetHint onGetScore onPrev onNext model =
+    div []
+        [ Html.text ("Now moves: " ++ toString (Tuple.second model.state))
+        , Html.br [] []
+        , Html.button [ onClick onPrev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
+        , Html.button [ onClick onNext, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
+        , Html.button [ onClick onGetScore ] [ text ("Get score") ]
+        , Html.text (toString model.currentScore)
+        , Html.button [ onClick onGetHint ] [ text ("Get hint") ]
+        , div [ errStyle ] [ text model.errorText ]
+        ]
+
+
+displayBoardWithPawns : OnFieldClicked -> Model -> Html.Html Msg
+displayBoardWithPawns onFieldClicked model =
     let
         isHighlighted lc =
             case model.possibleMoves of
@@ -54,35 +76,25 @@ view onFieldClicked onGetHint onGetScore onPrev onNext model =
                 Just ( from, to ) ->
                     lc == from || lc == to
 
-        getFieldStyle loc =
-            fieldStyle (isHighlighted loc) (isClicked loc) (isPartOfHint loc)
+        isCorner ( x, y ) =
+            (x == 0 || x == model.boardSize - 1) && (y == 0 || y == model.boardSize - 1)
 
-        --TODO maybe nicer way of handling empty field
-        setPawn elem =
-            if Model.isEmptyField elem then
-                div [] []
-            else
-                div [ pawnStyle elem ] []
+        isThrone ( x, y ) =
+            x == (model.boardSize - 1) // 2 && y == (model.boardSize - 1) // 2
+
+        getFieldStyle loc =
+            fieldStyle (isHighlighted loc) (isClicked loc) (isPartOfHint loc) (isCorner loc) (isThrone loc)
+
+        setPawn =
+            Maybe.map (\elem -> div [ pawnStyle elem ] []) >> Maybe.withDefault (div [] [])
     in
-        div [ style [ ( "display", "flex" ), ( "flex-direction", "row" ) ] ]
-            [ div []
-                (model.state
-                    |> Tuple.first
-                    |> Matrix.mapWithLocation (\loc elem -> div [ getFieldStyle loc, onClick (onFieldClicked loc) ] [ setPawn elem ])
-                    |> Matrix.toList
-                    |> List.map (div [ style [ ( "height", "56px" ) ] ])
-                )
-            , div []
-                [ Html.text ("Now moves: " ++ toString (Tuple.second model.state))
-                , Html.br [] []
-                , Html.button [ onClick onPrev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
-                , Html.button [ onClick onNext, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
-                , Html.button [ onClick onGetScore ] [ text ("Get score") ]
-                , Html.text (toString model.currentScore)
-                , Html.button [ onClick onGetHint ] [ text ("Get hint") ]
-                , div [ errStyle ] [ text model.errorText ]
-                ]
-            ]
+        div []
+            (model.state
+                |> Tuple.first
+                |> Matrix.mapWithLocation (\loc elem -> div [ getFieldStyle loc, onClick (onFieldClicked loc) ] [ setPawn elem ])
+                |> Matrix.toList
+                |> List.map (div [ style [ ( "height", "56px" ) ] ])
+            )
 
 
 errStyle : Attribute Msg
@@ -105,8 +117,16 @@ type alias IsPartOfHint =
     Bool
 
 
-fieldStyle : IsHighlighted -> IsClicked -> IsPartOfHint -> Attribute Msg
-fieldStyle highlighted clicked hint =
+type alias IsCorner =
+    Bool
+
+
+type alias IsThrone =
+    Bool
+
+
+fieldStyle : IsHighlighted -> IsClicked -> IsPartOfHint -> IsCorner -> IsThrone -> Attribute Msg
+fieldStyle highlighted clicked hint corner throne =
     let
         background =
             if hint then
@@ -115,6 +135,10 @@ fieldStyle highlighted clicked hint =
                 "orange"
             else if clicked then
                 "red"
+            else if corner then
+                "pink"
+            else if throne then
+                "purple"
             else
                 "peru"
     in
@@ -127,14 +151,11 @@ fieldStyle highlighted clicked hint =
             ]
 
 
-pawnStyle : Field -> Attribute Msg
-pawnStyle f =
+pawnStyle : Pawn -> Attribute Msg
+pawnStyle pawn =
     let
-        representationColor f =
-            case f of
-                Empty ->
-                    "peru"
-
+        representationColor pawn =
+            case pawn of
                 Defender ->
                     "white"
 
@@ -142,10 +163,10 @@ pawnStyle f =
                     "grey"
 
                 King ->
-                    "purple"
+                    "gold"
     in
         style
-            [ ( "backgroundColor", representationColor f )
+            [ ( "backgroundColor", representationColor pawn )
             , ( "height", "44px" )
             , ( "width", "44px" )
             , ( "margin-left", "3px" )

@@ -2,15 +2,14 @@ module Model
     exposing
         ( Msg(..)
         , Model
-        , Board
-        , Field(..)
+        , Positioning
+        , Pawn(..)
         , Move
         , GameState
         , WhoMoves
         , Token
         , emptyModel
         , emptyState
-        , isEmptyField
         , initGameDecoder
         , gameStateDecoder
         , locationDecoder
@@ -29,23 +28,22 @@ import List.Split exposing (chunksOfLeft)
 import Matrix exposing (Matrix, Location)
 
 
-type Field
-    = Empty
-    | Defender
-    | Attacker
-    | King
-
-
-type alias Board =
-    Matrix Field
-
-
 type alias WhoMoves =
     Int
 
 
+type Pawn
+    = Attacker
+    | Defender
+    | King
+
+
+type alias Positioning =
+    Matrix (Maybe Pawn)
+
+
 type alias GameState =
-    ( Board, WhoMoves )
+    ( Positioning, WhoMoves )
 
 
 type alias Move =
@@ -57,8 +55,8 @@ type alias Token =
 
 
 type alias Model =
-    { state : GameState
-    , boardSize : Int
+    { boardSize : Int
+    , state : GameState
     , clickedLocation : Maybe Matrix.Location
     , possibleMoves : Maybe (List Matrix.Location)
     , hint : Maybe Move
@@ -73,8 +71,8 @@ type alias Model =
 emptyModel : Model
 emptyModel =
     Model
-        emptyState
         0
+        emptyState
         Nothing
         Nothing
         Nothing
@@ -87,16 +85,7 @@ emptyModel =
 
 emptyState : GameState
 emptyState =
-    let
-        emptyBoard =
-            Matrix.square 2 (always Empty)
-    in
-        ( emptyBoard, 0 )
-
-
-isEmptyField : Field -> Bool
-isEmptyField =
-    (==) Empty
+    ( Matrix.square 11 (always Nothing), 0 )
 
 
 type alias HttpRes a =
@@ -140,48 +129,45 @@ hintDecoder =
 gameStateDecoder : Int -> Decode.Decoder GameState
 gameStateDecoder boardSize =
     let
-        charToField c =
+        charToPawn c =
             case c of
                 '.' ->
-                    Empty
+                    Nothing
 
                 'a' ->
-                    Attacker
+                    Just Attacker
 
                 'd' ->
-                    Defender
+                    Just Defender
 
                 'k' ->
-                    King
+                    Just King
 
                 _ ->
-                    Empty
+                    Nothing
 
-        decodeFields : Decode.Decoder (List (List Field))
-        decodeFields =
+        decodePawns2DList : Decode.Decoder (List (List (Maybe Pawn)))
+        decodePawns2DList =
             let
-                toFields =
-                    List.map charToField
-
                 toRows =
                     chunksOfLeft boardSize
 
-                stringTo2DFields =
-                    String.toList >> toFields >> toRows
+                stringTo2DPositions =
+                    String.toList >> List.map charToPawn >> toRows
             in
-                Decode.string |> Decode.andThen (stringTo2DFields >> Decode.succeed)
+                Decode.string |> Decode.andThen (stringTo2DPositions >> Decode.succeed)
 
-        decodeBoard : Decode.Decoder Board
-        decodeBoard =
-            decodeFields |> Decode.andThen (Matrix.fromList >> Decode.succeed)
+        decodePositioning : Decode.Decoder Positioning
+        decodePositioning =
+            decodePawns2DList |> Decode.andThen (Matrix.fromList >> Decode.succeed)
 
-        decodeFieldBoard =
-            Decode.field "board" decodeBoard
+        decodeFieldPositioning =
+            Decode.field "board" decodePositioning
 
         decodeFieldWhoMoves =
             Decode.field "whoMoves" Decode.int
     in
-        Decode.map2 (,) decodeFieldBoard decodeFieldWhoMoves
+        Decode.map2 (,) decodeFieldPositioning decodeFieldWhoMoves
 
 
 initGameDecoder : Decode.Decoder ( Token, GameState, Int )
@@ -235,24 +221,24 @@ locationEncoder =
 stateEncoder : GameState -> Encode.Value
 stateEncoder ( b, who ) =
     let
-        fieldToChar field =
-            case field of
-                Empty ->
+        pawnToChar pos =
+            case pos of
+                Nothing ->
                     '.'
 
-                Defender ->
+                Just Defender ->
                     'd'
 
-                Attacker ->
+                Just Attacker ->
                     'a'
 
-                King ->
+                Just King ->
                     'k'
 
-        boardToJsonValue =
-            Matrix.toList >> List.concat >> List.map fieldToChar >> String.fromList >> Encode.string
+        positionsToJsonValue =
+            Matrix.toList >> List.concat >> List.map pawnToChar >> String.fromList >> Encode.string
 
         whoToJsonValue =
             Encode.int
     in
-        Encode.object [ ( "board", boardToJsonValue b ), ( "whoMoves", whoToJsonValue who ) ]
+        Encode.object [ ( "board", positionsToJsonValue b ), ( "whoMoves", whoToJsonValue who ) ]

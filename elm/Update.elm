@@ -185,7 +185,7 @@ getHint token state =
             "getHint"
 
         encoder =
-            Encode.object [("state", Model.stateEncoder state)]
+            Encode.object [ ( "state", Model.stateEncoder state ) ]
 
         request =
             getRequest Nothing (Just token) url (Just encoder) Model.hintDecoder
@@ -200,7 +200,7 @@ makeMove token state locFrom locTo boardSize =
             "makeMove"
 
         encoder =
-            Encode.object [("state", Model.stateEncoder state), ("from", Model.locationEncoder locFrom), ("to", Model.locationEncoder locTo)]
+            Encode.object [ ( "state", Model.stateEncoder state ), ( "from", Model.locationEncoder locFrom ), ( "to", Model.locationEncoder locTo ) ]
 
         request =
             getRequest Nothing (Just token) url (Just encoder) (Model.gameStateDecoder boardSize)
@@ -215,7 +215,7 @@ getReachablePositions token state location =
             "getReachablePositions"
 
         encoder =
-            Encode.object [("state", Model.stateEncoder state), ("location", Model.locationEncoder location)]
+            Encode.object [ ( "state", Model.stateEncoder state ), ( "location", Model.locationEncoder location ) ]
 
         request =
             getRequest Nothing (Just token) url (Just encoder) Model.locationListDecoder
@@ -228,9 +228,9 @@ getCurrentScore token state =
     let
         url =
             "getScore"
-        
+
         encoder =
-            Encode.object [("state", Model.stateEncoder state)]
+            Encode.object [ ( "state", Model.stateEncoder state ) ]
 
         request =
             getRequest Nothing (Just token) url (Just encoder) Model.scoreDecoder

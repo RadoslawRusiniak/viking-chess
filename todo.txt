@@ -1,6 +1,4 @@
 
-display corners and throne in other way than the rest of the fields
-
 introduce concept of player and connect it to pawns
   => check if clicked pawn is a pawn of a player to move, if not ignore click
 
@@ -12,6 +10,6 @@ change wording - whomoves -> who's turn in jsons and code
 
 create separate model file for gamestate, history, (maybe also move or location) etc. with decoders/encoders
 
-separate board and options in view
+separate board and options in view (done a little bit, but maybe separate files?)
 
 make it look awesome... or at least better
