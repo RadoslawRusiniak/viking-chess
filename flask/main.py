@@ -17,13 +17,15 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'the quick brown fox jumps over the lazy dog'
 app.config['CORS_HEADERS'] = 'Content-Type'
 
-cors = CORS(app, resources={
-    r"/initGame": {"origins": "http://localhost:5000"}
+cors = CORS(app, resources =
+    { r"/initGame": {"origins": "http://localhost:5000"}
     , r"/getScore": {"origins": "http://localhost:5000"}
     , r"/getReachablePositions": {"origins": "http://localhost:5000"}
     , r"/makeMove": {"origins": "http://localhost:5000"}
     , r"/getHint": {"origins": "http://localhost:5000"}
-})
+    , r"/updateState": {"origins": "http://localhost:5000"}
+    }
+)
 
 hashedPassword = "$5$rounds=535000$CEoVj1v120WFeYfX$027jiw66sPzekyGfxq.ptuCOs6LyR8h4UjI9IJf3EV2"
 def isCorrectPassword(hdrs):
@@ -137,3 +139,13 @@ def getHint():
             }
         }
     })
+
+@app.route('/updateState', methods=['GET', 'POST'])
+@cross_origin(origin='localhost',headers=['Content-Type','Authorization'])
+def updateState():
+    if (not isCorrectRequest(request.headers)):
+        return None #TODO some error here
+
+    setupPosition(request.json["state"])
+
+    return jsonify({"dummy": "ok"}) #TODO

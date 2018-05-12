@@ -2,6 +2,7 @@ module Model
     exposing
         ( Msg(..)
         , Model
+        , Mode(..)
         , Positioning
         , Pawn(..)
         , Move
@@ -26,6 +27,11 @@ import Json.Encode as Encode
 import Maybe exposing (withDefault)
 import List.Split exposing (chunksOfLeft)
 import Matrix exposing (Matrix, Location)
+
+
+type Mode
+    = Game
+    | Edit
 
 
 type alias WhoMoves =
@@ -55,7 +61,8 @@ type alias Token =
 
 
 type alias Model =
-    { boardSize : Int
+    { mode : Mode
+    , boardSize : Int
     , state : GameState
     , clickedLocation : Maybe Matrix.Location
     , possibleMoves : Maybe (List Matrix.Location)
@@ -71,6 +78,7 @@ type alias Model =
 emptyModel : Model
 emptyModel =
     Model
+        Game
         0
         emptyState
         Nothing
@@ -104,6 +112,9 @@ type Msg
     | MakeMoveResponse (HttpRes GameState)
     | GetHint
     | GetHintResponse (HttpRes Move)
+    | EditPosition
+    | FinishEditing
+    | UpdateStateResponse (HttpRes ())
 
 
 locationDecoder : Decode.Decoder Matrix.Location

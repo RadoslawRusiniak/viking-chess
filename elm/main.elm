@@ -13,7 +13,7 @@ main =
         --TODO how to ignore
         (always Dummy)
         { init = Update.init
-        , view = View.view Clicked GetHint GetScore Prev Next
+        , view = View.view Clicked GetHint GetScore Prev Next EditPosition FinishEditing
         , update = Update.update
         , subscriptions = Subscriptions.subscriptions
         }

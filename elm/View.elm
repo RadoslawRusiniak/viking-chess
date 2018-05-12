@@ -4,7 +4,7 @@ import Html exposing (Html, Attribute, button, div, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Matrix
-import Model exposing (Model, Pawn(..), Msg)
+import Model exposing (Model, Mode(..), Pawn(..), Msg)
 
 
 type alias OnFieldClicked =
@@ -27,26 +27,43 @@ type alias OnNext =
     Msg
 
 
-view : OnFieldClicked -> OnGetHint -> OnGetScore -> OnPrev -> OnNext -> Model -> Html Msg
-view onFieldClicked onGetHint onGetScore onPrev onNext model =
+type alias OnEdit =
+    Msg
+
+
+type alias OnFinishEdit =
+    Msg
+
+
+view : OnFieldClicked -> OnGetHint -> OnGetScore -> OnPrev -> OnNext -> OnEdit -> OnFinishEdit -> Model -> Html Msg
+view onFieldClicked onGetHint onGetScore onPrev onNext onEdit onFinishEdit model =
     div [ style [ ( "display", "flex" ), ( "flex-direction", "row" ) ] ]
         [ displayBoardWithPawns onFieldClicked model
-        , displayOptionsPanel onGetHint onGetScore onPrev onNext model
+        , displayOptionsPanel onGetHint onGetScore onPrev onNext onEdit onFinishEdit model
         ]
 
 
-displayOptionsPanel : OnGetHint -> OnGetScore -> OnPrev -> OnNext -> Model -> Html Msg
-displayOptionsPanel onGetHint onGetScore onPrev onNext model =
-    div []
-        [ Html.text ("Now moves: " ++ toString (Tuple.second model.state))
-        , Html.br [] []
-        , Html.button [ onClick onPrev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
-        , Html.button [ onClick onNext, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
-        , Html.button [ onClick onGetScore ] [ text ("Get score") ]
-        , Html.text (toString model.currentScore)
-        , Html.button [ onClick onGetHint ] [ text ("Get hint") ]
-        , div [ errStyle ] [ text model.errorText ]
-        ]
+displayOptionsPanel : OnGetHint -> OnGetScore -> OnPrev -> OnNext -> OnEdit -> OnFinishEdit -> Model -> Html Msg
+displayOptionsPanel onGetHint onGetScore onPrev onNext onEdit onFinishEdit model =
+    let
+        isEditing =
+            model.mode == Edit
+
+        isPlaying =
+            model.mode == Game
+    in
+        div []
+            [ Html.text ("Now moves: " ++ toString (Tuple.second model.state))
+            , Html.br [] []
+            , Html.button [ onClick onPrev, Html.Attributes.disabled (List.isEmpty model.historyPrev) ] [ text "prev" ]
+            , Html.button [ onClick onNext, Html.Attributes.disabled (List.isEmpty model.historyNext) ] [ text "next" ]
+            , Html.button [ onClick onGetScore ] [ text ("Get score") ]
+            , Html.text (toString model.currentScore)
+            , Html.button [ onClick onGetHint ] [ text ("Get hint") ]
+            , Html.button [ onClick onEdit, Html.Attributes.disabled isEditing ] [ text ("Edit") ]
+            , Html.button [ onClick onFinishEdit, Html.Attributes.disabled isPlaying ] [ text ("Finish edit") ]
+            , div [ errStyle ] [ text model.errorText ]
+            ]
 
 
 displayBoardWithPawns : OnFieldClicked -> Model -> Html.Html Msg

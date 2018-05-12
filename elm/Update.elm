@@ -5,7 +5,7 @@ import Json.Encode as Encode
 import Http
 import Maybe exposing (withDefault)
 import Matrix
-import Model exposing (Model, Msg(..), GameState, Token)
+import Model exposing (Model, Msg(..), Pawn(..), GameState, Token)
 import Navigation
 import UrlParser exposing ((<?>), stringParam)
 
@@ -36,8 +36,8 @@ update msg model =
                 , historyNext = m.state :: m.historyNext
             }
 
-        handleClick : Model -> Matrix.Location -> ( Model, Cmd Msg )
-        handleClick model location =
+        handleGameClick : Model -> Matrix.Location -> ( Model, Cmd Msg )
+        handleGameClick model location =
             case model.clickedLocation of
                 Nothing ->
                     ( { model | clickedLocation = Just location }
@@ -51,6 +51,35 @@ update msg model =
 
                         False ->
                             ( { model | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none )
+
+        handleEditClick : Model -> Matrix.Location -> ( Model, Cmd Msg )
+        handleEditClick model location =
+            let
+                positions =
+                    Tuple.first model.state
+
+                rotatePawn : Maybe Pawn -> Maybe Pawn
+                rotatePawn p =
+                    case p of
+                        Nothing ->
+                            Just Attacker
+
+                        Just Attacker ->
+                            Just Defender
+
+                        Just Defender ->
+                            Just King
+
+                        Just King ->
+                            Nothing
+
+                updatePawns location =
+                    Matrix.update location rotatePawn
+
+                updatePositioning ( pos, whoMoves ) location =
+                    ( updatePawns location pos, whoMoves )
+            in
+                ( { model | state = updatePositioning model.state location }, Cmd.none )
     in
         case msg of
             Dummy ->
@@ -63,7 +92,10 @@ update msg model =
                 ( { model | token = t, state = s, boardSize = boardSize }, Cmd.none )
 
             Clicked location ->
-                handleClick model location
+                if model.mode == Model.Game then
+                    handleGameClick model location
+                else
+                    handleEditClick model location
 
             Next ->
                 ( zipNext model, Cmd.none )
@@ -113,6 +145,18 @@ update msg model =
                 ( { model | clickedLocation = Nothing, possibleMoves = Nothing, hint = Just mv }
                 , Cmd.none
                 )
+
+            EditPosition ->
+                ( { model | mode = Model.Edit }, Cmd.none )
+
+            FinishEditing ->
+                ( { model | mode = Model.Game }, updateState model.token model.state )
+
+            UpdateStateResponse (Err e) ->
+                handleErr e
+
+            UpdateStateResponse (Ok ()) ->
+                ( model, Cmd.none )
 
 
 init : Navigation.Location -> ( Model, Cmd Msg )
@@ -176,6 +220,21 @@ initGame pswrd =
             getRequest (Just pswrd) Nothing url Nothing Model.initGameDecoder
     in
         Http.send InitGameResponse request
+
+
+updateState : Token -> GameState -> Cmd Msg
+updateState token state =
+    let
+        url =
+            "updateState"
+
+        encoder =
+            Encode.object [ ( "state", Model.stateEncoder state ) ]
+
+        request =
+            getRequest Nothing (Just token) url (Just encoder) (Decode.succeed ())
+    in
+        Http.send UpdateStateResponse request
 
 
 getHint : Token -> GameState -> Cmd Msg
