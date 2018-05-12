@@ -146,6 +146,13 @@ update msg model =
                 , Cmd.none
                 )
 
+            ChangeSide ->
+                let
+                    newstate =
+                        ( Tuple.first model.state, 1 - Tuple.second model.state )
+                in
+                    ( { model | state = newstate }, updateState model.token newstate )
+
             EditPosition ->
                 ( { model | mode = Model.Edit }, Cmd.none )
 

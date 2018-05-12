@@ -112,6 +112,7 @@ type Msg
     | MakeMoveResponse (HttpRes GameState)
     | GetHint
     | GetHintResponse (HttpRes Move)
+    | ChangeSide
     | EditPosition
     | FinishEditing
     | UpdateStateResponse (HttpRes ())
