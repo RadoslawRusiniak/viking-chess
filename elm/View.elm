@@ -36,26 +36,30 @@ type alias OnEdit =
     Msg
 
 
+type alias OnClearPawns =
+    Msg
+
+
 type alias OnFinishEdit =
     Msg
 
 
-view : OnFieldClicked -> OnGetHint -> OnGetScore -> OnPrev -> OnNext -> OnSideChange -> OnEdit -> OnFinishEdit -> Model -> Html Msg
-view onFieldClicked onGetHint onGetScore onPrev onNext onSideChange onEdit onFinishEdit model =
+view : OnFieldClicked -> OnGetHint -> OnGetScore -> OnPrev -> OnNext -> OnSideChange -> OnEdit -> OnClearPawns -> OnFinishEdit -> Model -> Html Msg
+view onFieldClicked onGetHint onGetScore onPrev onNext onSideChange onEdit onClearPawns onFinishEdit model =
     div [ style [ ( "display", "flex" ), ( "flex-direction", "row" ) ] ]
         [ displayBoardWithPawns onFieldClicked model
-        , displayOptionsPanel onGetHint onGetScore onPrev onNext onSideChange onEdit onFinishEdit model
+        , displayOptionsPanel onGetHint onGetScore onPrev onNext onSideChange onEdit onClearPawns onFinishEdit model
         ]
 
 
-displayOptionsPanel : OnGetHint -> OnGetScore -> OnPrev -> OnNext -> OnSideChange -> OnEdit -> OnFinishEdit -> Model -> Html Msg
-displayOptionsPanel onGetHint onGetScore onPrev onNext onSideChange onEdit onFinishEdit model =
+displayOptionsPanel : OnGetHint -> OnGetScore -> OnPrev -> OnNext -> OnSideChange -> OnEdit -> OnClearPawns -> OnFinishEdit -> Model -> Html Msg
+displayOptionsPanel onGetHint onGetScore onPrev onNext onSideChange onEdit onClearPawns onFinishEdit model =
     div [ style [ ( "display", "flex" ), ( "flex-direction", "column" ), ( "width", "180px" ), ( "margin-left", "40px" ), ( "justify-content", "space-around" ) ] ]
         [ displayWhosTurnPanel onSideChange (Tuple.second model.state)
         , Html.button [ onClick onGetHint ] [ text ("Get hint") ]
         , displayHistoryPanel onPrev onNext model.historyPrev model.historyNext
         , displayScorePanel onGetScore model.currentScore
-        , displayEditPanel onEdit onFinishEdit model.mode
+        , displayEditPanel onEdit onClearPawns onFinishEdit model.mode
         , div [ errStyle ] [ text model.errorText ]
         ]
 
@@ -84,10 +88,11 @@ displayScorePanel onGetScore currentScore =
         ]
 
 
-displayEditPanel : OnEdit -> OnFinishEdit -> Mode -> Html Msg
-displayEditPanel onEdit onFinishEdit mode =
+displayEditPanel : OnEdit -> OnClearPawns -> OnFinishEdit -> Mode -> Html Msg
+displayEditPanel onEdit onClearPawns onFinishEdit mode =
     div [ panelStyle ]
         [ Html.button [ onClick onEdit, Html.Attributes.disabled (mode == Edit) ] [ text ("Edit") ]
+        , Html.button [ onClick onClearPawns, Html.Attributes.disabled (mode == Game) ] [ text ("Clear pawns") ]
         , Html.button [ onClick onFinishEdit, Html.Attributes.disabled (mode == Game) ] [ text ("Finish edit") ]
         ]
 

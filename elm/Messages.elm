@@ -23,5 +23,6 @@ type Msg
     | GetHintResponse (HttpRes Move)
     | ChangeSide
     | EditPosition
+    | ClearPawns
     | FinishEditing
     | UpdateStateResponse (HttpRes ())

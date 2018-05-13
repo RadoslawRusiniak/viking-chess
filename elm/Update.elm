@@ -182,6 +182,13 @@ update msg model =
             EditPosition ->
                 ( { model | mode = Model.Edit }, Cmd.none )
 
+            ClearPawns ->
+                let
+                    newstate =
+                        Tuple.mapFirst (always Model.emptyPositioning) model.state
+                in
+                    ( { model | state = newstate }, Cmd.none )
+
             FinishEditing ->
                 ( { model | mode = Model.Game }, updateState model.token model.state )
 

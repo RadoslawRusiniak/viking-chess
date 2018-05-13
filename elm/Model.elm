@@ -13,6 +13,7 @@ module Model
         , Token
         , emptyModel
         , emptyState
+        , emptyPositioning
         , initGameDecoder
         , gameStateDecoder
         , locationDecoder
@@ -118,9 +119,14 @@ emptyModel =
         ""
 
 
+emptyPositioning : Positioning
+emptyPositioning =
+    Matrix.square 11 (always Nothing)
+
+
 emptyState : GameState
 emptyState =
-    ( Matrix.square 11 (always Nothing), WAttacker )
+    ( emptyPositioning, WAttacker )
 
 
 locationDecoder : Decode.Decoder Matrix.Location
