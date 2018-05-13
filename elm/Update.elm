@@ -28,6 +28,7 @@ update msg model =
                 | historyPrev = m.state :: m.historyPrev
                 , state = getHead m.historyNext
                 , historyNext = getTail m.historyNext
+                , possibleMoves = Nothing
             }
 
         zipPrev m =
@@ -35,6 +36,7 @@ update msg model =
                 | historyPrev = getTail m.historyPrev
                 , state = getHead m.historyPrev
                 , historyNext = m.state :: m.historyNext
+                , possibleMoves = Nothing
             }
 
         handleGameClick : Model -> Matrix.Location -> ( Model, Cmd Msg )
@@ -114,10 +116,18 @@ update msg model =
                     handleEditClick model location
 
             Next ->
-                ( zipNext model, Cmd.none )
+                let
+                    newmodel =
+                        zipNext model
+                in
+                    ( newmodel, updateState newmodel.token newmodel.state )
 
             Prev ->
-                ( zipPrev model, Cmd.none )
+                let
+                    newmodel =
+                        zipPrev model
+                in
+                    ( newmodel, updateState newmodel.token newmodel.state )
 
             GetScore ->
                 ( model, getCurrentScore model.token model.state )
