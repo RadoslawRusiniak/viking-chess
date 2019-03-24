@@ -23,7 +23,7 @@ Note: if you are using Windows with virtualenv then instead of "pip install ..."
 
 4. Elm packages. Navigate to project root, then to elm subdirectory and run:
 
-    elm package install
+    elm install
 
 Note: it is very important to be in elm subdirectory everytime you perform operations related to elm. If you are in the root of a project some of them may even work, not all tho :( So you may end up spending a lot of time wondering what is wrong, just like me...
 
