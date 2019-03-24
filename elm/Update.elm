@@ -7,15 +7,18 @@ import Maybe exposing (withDefault)
 import Matrix
 import Messages exposing (Msg(..))
 import Model exposing (Model, Pawn(..), GameState, Token)
-import Navigation
-import UrlParser exposing ((<?>), stringParam)
+--import Navigation
+import Browser.Navigation exposing (Key)
+import Url exposing (Url)
+import Url.Parser as UrlParser exposing ((<?>))
+import Url.Parser.Query as UrlParserQuery
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         handleErr e =
-            ( { model | errorText = toString e }, Cmd.none )
+            ( { model | errorText = Debug.toString e }, Cmd.none )
 
         getHead =
             List.head >> withDefault Model.emptyState
@@ -40,41 +43,41 @@ update msg model =
             }
 
         handleGameClick : Model -> Matrix.Location -> ( Model, Cmd Msg )
-        handleGameClick model location =
-            case model.clickedLocation of
+        handleGameClick cmodel location =
+            case cmodel.clickedLocation of
                 Nothing ->
                     let
                         whosTurn =
-                            Tuple.second model.state
+                            Tuple.second cmodel.state
 
                         mpawn =
-                            Tuple.first model.state |> Matrix.get location |> Maybe.withDefault Nothing
+                            Tuple.first cmodel.state |> Matrix.get location |> Maybe.withDefault Nothing
 
                         sameSide =
                             Maybe.map (Model.isSameSide whosTurn) mpawn |> Maybe.withDefault False
                     in
                         if sameSide then
-                            ( { model | clickedLocation = Just location }
-                            , getReachablePositions model.token model.state location
+                            ( { cmodel | clickedLocation = Just location }
+                            , getReachablePositions cmodel.token cmodel.state location
                             )
                         else
-                            ( { model | clickedLocation = Just location }
+                            ( { cmodel | clickedLocation = Just location }
                             , Cmd.none
                             )
 
                 Just from ->
-                    case List.member location (model.possibleMoves |> withDefault []) of
+                    case List.member location (cmodel.possibleMoves |> withDefault []) of
                         True ->
-                            ( { model | clickedLocation = Nothing }, makeMove model.token model.state from location model.boardSize )
+                            ( { cmodel | clickedLocation = Nothing }, makeMove cmodel.token cmodel.state from location cmodel.boardSize )
 
                         False ->
-                            ( { model | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none )
+                            ( { cmodel | clickedLocation = Nothing, possibleMoves = Nothing }, Cmd.none )
 
         handleEditClick : Model -> Matrix.Location -> ( Model, Cmd Msg )
-        handleEditClick model location =
+        handleEditClick cmodel location =
             let
                 positions =
-                    Tuple.first model.state
+                    Tuple.first cmodel.state
 
                 rotatePawn : Maybe Pawn -> Maybe Pawn
                 rotatePawn p =
@@ -91,13 +94,13 @@ update msg model =
                         Just King ->
                             Nothing
 
-                updatePawns location =
-                    Matrix.update location rotatePawn
+                updatePawns inlocation =
+                    Matrix.update inlocation rotatePawn
 
-                updatePositioning location =
-                    Tuple.mapFirst (updatePawns location)
+                updatePositioning inlocation =
+                    Tuple.mapFirst (updatePawns inlocation)
             in
-                ( { model | state = updatePositioning location model.state }, Cmd.none )
+                ( { cmodel | state = updatePositioning location cmodel.state }, Cmd.none )
     in
         case msg of
             Dummy ->
@@ -198,17 +201,23 @@ update msg model =
             UpdateStateResponse (Ok ()) ->
                 ( model, Cmd.none )
 
+            LinkClicked _ ->
+                ( model, Cmd.none )
 
-init : Navigation.Location -> ( Model, Cmd Msg )
+            UrlChanged _ ->
+                ( model, Cmd.none )
+
+
+init : Url -> ( Model, Cmd Msg )
 init location =
     let
         --TODO how to get rid of "main.elm"
         parser : UrlParser.Parser (Maybe String -> a) a
         parser =
-            UrlParser.s "main.elm" <?> stringParam "password"
+            UrlParser.s "main.elm" <?> UrlParserQuery.string "password"
 
         parsePassword =
-            UrlParser.parsePath parser >> withDefault Nothing >> withDefault "wrong"
+            UrlParser.parse parser >> withDefault Nothing >> withDefault "wrong"
     in
         ( Model.emptyModel
         , initGame <| parsePassword location

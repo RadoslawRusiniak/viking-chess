@@ -2,19 +2,20 @@ module Main exposing (main)
 
 import Messages exposing (Msg(..))
 import Model exposing (Model)
-import Navigation
+--import Navigation
+import Browser
 import Subscriptions
 import Update
 import View
 
 
-main : Program Never Model Msg
+main : Program () Model Msg
 main =
-    Navigation.program
-        --TODO how to ignore
-        (always Dummy)
-        { init = Update.init
+    Browser.application
+        { init = (\_ addr _ -> Update.init addr)
         , view = View.view Clicked GetHint GetScore Prev Next ChangeSide EditPosition ClearPawns FinishEditing
         , update = Update.update
         , subscriptions = Subscriptions.subscriptions
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
         }

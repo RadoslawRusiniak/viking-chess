@@ -3,6 +3,8 @@ module Messages exposing (Msg(..))
 import Http
 import Matrix
 import Model exposing (Token, GameState, Move)
+import Browser
+import Url
 
 
 type alias HttpRes a =
@@ -26,3 +28,5 @@ type Msg
     | ClearPawns
     | FinishEditing
     | UpdateStateResponse (HttpRes ())
+    | LinkClicked Browser.UrlRequest
+    | UrlChanged Url.Url

@@ -136,7 +136,7 @@ locationDecoder =
 
 moveDecoder : Decode.Decoder Move
 moveDecoder =
-    Decode.map2 (,) (Decode.field "from" locationDecoder) (Decode.field "to" locationDecoder)
+    Decode.map2 Tuple.pair (Decode.field "from" locationDecoder) (Decode.field "to" locationDecoder)
 
 
 locationListDecoder : Decode.Decoder (List Matrix.Location)
@@ -202,7 +202,7 @@ gameStateDecoder boardSize =
         decodeFieldWhoMoves =
             Decode.field "whoMoves" Decode.int |> Decode.andThen (intToWhosTurn >> Decode.succeed)
     in
-        Decode.map2 (,) decodeFieldPositioning decodeFieldWhoMoves
+        Decode.map2 Tuple.pair decodeFieldPositioning decodeFieldWhoMoves
 
 
 initGameDecoder : Decode.Decoder ( Token, GameState, Int )
@@ -216,7 +216,7 @@ initGameDecoder =
 
         initDecoder : Int -> Decode.Decoder ( Token, GameState )
         initDecoder boardSize =
-            Decode.map2 (,) tokenDecoder (gameStateDecoder boardSize)
+            Decode.map2 Tuple.pair tokenDecoder (gameStateDecoder boardSize)
 
         appendSize : Int -> ( Token, GameState ) -> Decode.Decoder ( Token, GameState, Int )
         appendSize boardSize ( t, st ) =

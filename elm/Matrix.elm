@@ -62,7 +62,7 @@ type alias Location =
 -}
 loc : Int -> Int -> Location
 loc =
-    (,)
+    Tuple.pair
 
 
 {-| Extract the row number from a location
@@ -113,9 +113,9 @@ will give back the matrix
 matrix : Int -> Int -> (Location -> a) -> Matrix a
 matrix numRows numCols f =
     Array.initialize numRows
-        (\row ->
+        (\currow ->
             Array.initialize numCols
-                (\col -> f (loc row col))
+                (\curcol -> f (loc currow curcol))
         )
 
 
@@ -144,12 +144,12 @@ is the location of the element.
 mapWithLocation : (Location -> a -> b) -> Matrix a -> Matrix b
 mapWithLocation f m =
     Array.indexedMap
-        (\rowNum row ->
+        (\rowNum currow ->
             Array.indexedMap
                 (\colNum element ->
                     f (loc rowNum colNum) element
                 )
-                row
+                currow
         )
         m
 

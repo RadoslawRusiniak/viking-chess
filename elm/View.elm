@@ -6,6 +6,7 @@ import Html.Events exposing (onClick)
 import Matrix
 import Messages exposing (Msg)
 import Model exposing (Model, Mode(..), Pawn(..), GameState, WhoMoves)
+import Browser
 
 
 type alias OnFieldClicked =
@@ -44,29 +45,42 @@ type alias OnFinishEdit =
     Msg
 
 
-view : OnFieldClicked -> OnGetHint -> OnGetScore -> OnPrev -> OnNext -> OnSideChange -> OnEdit -> OnClearPawns -> OnFinishEdit -> Model -> Html Msg
+view : OnFieldClicked -> OnGetHint -> OnGetScore -> OnPrev -> OnNext -> OnSideChange -> OnEdit -> OnClearPawns -> OnFinishEdit -> Model -> Browser.Document Msg
 view onFieldClicked onGetHint onGetScore onPrev onNext onSideChange onEdit onClearPawns onFinishEdit model =
-    div [ style [ ( "display", "flex" ), ( "flex-direction", "row" ) ] ]
-        [ displayBoardWithPawns onFieldClicked model
-        , displayOptionsPanel onGetHint onGetScore onPrev onNext onSideChange onEdit onClearPawns onFinishEdit model
+    { title = "Strona1"
+    , body =
+        [ div
+            [ style "display" "flex"
+            , style "flex-direction" "row"
+            ]
+            [ displayBoardWithPawns onFieldClicked model
+            , displayOptionsPanel onGetHint onGetScore onPrev onNext onSideChange onEdit onClearPawns onFinishEdit model
+            ]
         ]
+    }
 
 
 displayOptionsPanel : OnGetHint -> OnGetScore -> OnPrev -> OnNext -> OnSideChange -> OnEdit -> OnClearPawns -> OnFinishEdit -> Model -> Html Msg
 displayOptionsPanel onGetHint onGetScore onPrev onNext onSideChange onEdit onClearPawns onFinishEdit model =
-    div [ style [ ( "display", "flex" ), ( "flex-direction", "column" ), ( "width", "180px" ), ( "margin-left", "40px" ), ( "justify-content", "space-around" ) ] ]
+    div
+        [ style "display" "flex"
+        , style "flex-direction" "column"
+        , style "width" "180px"
+        , style "margin-left" "40px"
+        , style "justify-content" "space-around"
+        ]
         [ displayWhosTurnPanel onSideChange (Tuple.second model.state)
         , Html.button [ onClick onGetHint ] [ text ("Get hint") ]
         , displayHistoryPanel onPrev onNext model.historyPrev model.historyNext
         , displayScorePanel onGetScore model.currentScore
         , displayEditPanel onEdit onClearPawns onFinishEdit model.mode
-        , div [ errStyle ] [ text model.errorText ]
+        , div errStyle [ text model.errorText ]
         ]
 
 
 displayWhosTurnPanel : OnSideChange -> WhoMoves -> Html Msg
 displayWhosTurnPanel onSideChange whosTurn =
-    div [ panelStyle ]
+    div panelStyle
         [ Html.text ("Now moves: " ++ Model.toString whosTurn)
         , Html.button [ onClick onSideChange ] [ text ("Change side") ]
         ]
@@ -74,7 +88,7 @@ displayWhosTurnPanel onSideChange whosTurn =
 
 displayHistoryPanel : OnPrev -> OnNext -> List GameState -> List GameState -> Html Msg
 displayHistoryPanel onPrev onNext historyPrev historyNext =
-    div [ panelStyle ]
+    div panelStyle
         [ Html.button [ onClick onPrev, Html.Attributes.disabled (List.isEmpty historyPrev) ] [ text "history prev" ]
         , Html.button [ onClick onNext, Html.Attributes.disabled (List.isEmpty historyNext) ] [ text "history next" ]
         ]
@@ -82,24 +96,27 @@ displayHistoryPanel onPrev onNext historyPrev historyNext =
 
 displayScorePanel : OnGetScore -> Float -> Html Msg
 displayScorePanel onGetScore currentScore =
-    div [ panelStyle ]
+    div panelStyle
         [ Html.button [ onClick onGetScore ] [ text ("Get score") ]
-        , Html.text (toString currentScore)
+        , Html.text (String.fromFloat currentScore)
         ]
 
 
 displayEditPanel : OnEdit -> OnClearPawns -> OnFinishEdit -> Mode -> Html Msg
 displayEditPanel onEdit onClearPawns onFinishEdit mode =
-    div [ panelStyle ]
+    div panelStyle
         [ Html.button [ onClick onEdit, Html.Attributes.disabled (mode == Edit) ] [ text ("Edit") ]
         , Html.button [ onClick onClearPawns, Html.Attributes.disabled (mode == Game) ] [ text ("Clear pawns") ]
         , Html.button [ onClick onFinishEdit, Html.Attributes.disabled (mode == Game) ] [ text ("Finish edit") ]
         ]
 
 
-panelStyle : Attribute Msg
+panelStyle : List (Attribute Msg)
 panelStyle =
-    style [ ( "display", "flex" ), ( "flex-direction", "row" ), ( "justify-content", "space-between" ) ]
+    [ style "display" "flex"
+    , style "flex-direction" "row"
+    , style "justify-content" "space-between"
+    ]
 
 
 displayBoardWithPawns : OnFieldClicked -> Model -> Html.Html Msg
@@ -139,23 +156,22 @@ displayBoardWithPawns onFieldClicked model =
             fieldStyle (isHighlighted loc) (isClicked loc) (isPartOfHint loc) (isCorner loc) (isThrone loc)
 
         setPawn =
-            Maybe.map (\elem -> div [ pawnStyle elem ] []) >> Maybe.withDefault (div [] [])
+            Maybe.map (\elem -> div (pawnStyle elem) []) >> Maybe.withDefault (div [] [])
     in
         div []
             (model.state
                 |> Tuple.first
-                |> Matrix.mapWithLocation (\loc elem -> div [ getFieldStyle loc, onClick (onFieldClicked loc) ] [ setPawn elem ])
+                |> Matrix.mapWithLocation (\loc elem -> div (onClick (onFieldClicked loc) :: (getFieldStyle loc)) [ setPawn elem ])
                 |> Matrix.toList
-                |> List.map (div [ style [ ( "height", "56px" ) ] ])
+                |> List.map (div [ style "height" "56px" ])
             )
 
 
-errStyle : Attribute Msg
+errStyle : List (Attribute Msg)
 errStyle =
-    style
-        [ ( "height", "100px" )
-        , ( "width", "100px" )
-        ]
+    [ style "height" "100px"
+    , style "width" "100px"
+    ]
 
 
 type alias IsHighlighted =
@@ -178,7 +194,7 @@ type alias IsThrone =
     Bool
 
 
-fieldStyle : IsHighlighted -> IsClicked -> IsPartOfHint -> IsCorner -> IsThrone -> Attribute Msg
+fieldStyle : IsHighlighted -> IsClicked -> IsPartOfHint -> IsCorner -> IsThrone -> List (Attribute Msg)
 fieldStyle highlighted clicked hint corner throne =
     let
         background =
@@ -195,20 +211,19 @@ fieldStyle highlighted clicked hint corner throne =
             else
                 "peru"
     in
-        style
-            [ ( "backgroundColor", background )
-            , ( "height", "50px" )
-            , ( "width", "50px" )
-            , ( "border", "3px solid black" )
-            , ( "display", "inline-block" )
-            ]
+        [ style "backgroundColor" background
+        , style "height" "50px"
+        , style "width" "50px"
+        , style "border" "3px solid black"
+        , style "display" "inline-block"
+        ]
 
 
-pawnStyle : Pawn -> Attribute Msg
+pawnStyle : Pawn -> List (Attribute Msg)
 pawnStyle pawn =
     let
-        representationColor pawn =
-            case pawn of
+        representationColor cpawn =
+            case cpawn of
                 Defender ->
                     "white"
 
@@ -218,13 +233,12 @@ pawnStyle pawn =
                 King ->
                     "gold"
     in
-        style
-            [ ( "backgroundColor", representationColor pawn )
-            , ( "height", "44px" )
-            , ( "width", "44px" )
-            , ( "margin-left", "3px" )
-            , ( "margin-top", "3px" )
-            , ( "display", "inline-block" )
-            , ( "position", "absolute" )
-            , ( "-webkit-border-radius", "44px" )
-            ]
+        [ style "backgroundColor" (representationColor pawn)
+        , style "height" "44px"
+        , style "width" "44px"
+        , style "margin-left" "3px"
+        , style "margin-top" "3px"
+        , style "display" "inline-block"
+        , style "position" "absolute"
+        , style "-webkit-border-radius" "44px"
+        ]
